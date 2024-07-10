@@ -1,6 +1,7 @@
 package equalizer
 
 import (
+	"fmt"
 	"sort"
 	"testing"
 
@@ -108,11 +109,11 @@ func TestEqualize(t *testing.T) {
 
 	result, err := Run(sourceSpec, targetSpec, sourceMapOfArrays, targetMapOfArrays)
 
-	//fmt.Println("Equalize Run Result")
-	//fmt.Println("EqualizedData: " + fmt.Sprint(result.EqualizedData))
-	//fmt.Println("UpdatedData: " + fmt.Sprint(result.UpdateData))
-	//fmt.Println("InsertedData: " + fmt.Sprint(result.InsertData))
-	//fmt.Println("DeletedData: " + fmt.Sprint(result.DeleteData))
+	fmt.Println("Equalize Run Result")
+	fmt.Println("EqualizedData: " + fmt.Sprint(result.EqualizedData))
+	fmt.Println("UpdatedData: " + fmt.Sprint(result.UpdateData))
+	fmt.Println("InsertedData: " + fmt.Sprint(result.InsertData))
+	fmt.Println("DeletedData: " + fmt.Sprint(result.DeleteData))
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)

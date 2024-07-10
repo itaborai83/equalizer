@@ -1,6 +1,10 @@
 package specs
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+)
 
 type TableSpec struct {
 	Name                string       `json:"name"`
@@ -176,4 +180,17 @@ func NewerThan(sourceSpec, targetSpec *TableSpec, sourceData, targetData map[str
 	}
 	// unsupport type
 	panic("unknown type: " + sourceTypeName)
+}
+
+func ReadSpecFile(filePath string) (*TableSpec, error) {
+	spec := &TableSpec{}
+	bytes, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(bytes, spec)
+	if err != nil {
+		return nil, err
+	}
+	return spec, nil
 }
