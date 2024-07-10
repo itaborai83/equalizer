@@ -9,13 +9,10 @@ import (
 )
 
 type EqualizeResult struct {
-	SourceSpec    *specs.TableSpec
-	TargetSpec    *specs.TableSpec
 	InsertData    interface{}
 	UpdateData    interface{}
 	DeleteData    interface{}
 	EqualizedData interface{}
-	Error         error
 }
 
 type PartitionAnalysisRequest struct {
@@ -29,7 +26,6 @@ type PartitionAnalysisRequest struct {
 }
 
 type PartitionAnalysisResult struct {
-	RowKeyHash       uint64
 	InsertIndices    []int
 	UpdateIndices    []int
 	DeleteIndices    []int
@@ -50,9 +46,6 @@ func GetColumnNames(data map[string][]interface{}) ([]string, error) {
 	return columnNames, nil
 }
 
-func ComputePartitionCount(sourceRowCount, targetRowCount int) int {
-	return sourceRowCount + targetRowCount
-}
 func ComputeRowKeyHash(h *hasher.Hasher, spec *specs.TableSpec, data map[string][]interface{}, rowIndex int) (uint64, error) {
 	h.Reset()
 	for _, keyColumn := range spec.KeyColumns {
@@ -65,7 +58,11 @@ func ComputeRowKeyHash(h *hasher.Hasher, spec *specs.TableSpec, data map[string]
 	return h.GetHash()
 }
 
-func ComputeRowKeyHashes(spec *specs.TableSpec, columnNames []string, data map[string][]interface{}) (map[uint64][]int, error) {
+func ComputePartitionMap(spec *specs.TableSpec, data map[string][]interface{}) (map[uint64][]int, error) {
+	columnNames, err := GetColumnNames(data)
+	if err != nil {
+		return nil, err
+	}
 	hashes := make(map[uint64][]int)
 	hasher := hasher.NewHasher()
 	rowCount := len(data[columnNames[0]])
@@ -96,13 +93,11 @@ func MergeRowKeyHashes(sourceRowKeyHashes, targetRowKeyHashes map[uint64][]int) 
 }
 
 func ProcessPartition(request *PartitionAnalysisRequest, response *PartitionAnalysisResult) {
-	result := &PartitionAnalysisResult{
-		RowKeyHash:       request.RowKeyHash,
-		InsertIndices:    make([]int, 0),
-		UpdateIndices:    make([]int, 0),
-		DeleteIndices:    make([]int, 0),
-		EqualizedIndices: make([]int, 0),
-	}
+	// reset the response
+	response.InsertIndices = make([]int, 0)
+	response.UpdateIndices = make([]int, 0)
+	response.DeleteIndices = make([]int, 0)
+	response.EqualizedIndices = make([]int, 0)
 
 	matchedSourceIndices := make(map[int]bool)
 	matchedTargetIndices := make(map[int]bool)
@@ -120,25 +115,25 @@ func ProcessPartition(request *PartitionAnalysisRequest, response *PartitionAnal
 				// check if the source row is newer than the target row to determine whether to update or not
 				newer := specs.NewerThan(request.SourceSpec, request.TargetSpec, request.SourceData, request.TargetData, srcIndex, tgtIndex)
 				if newer {
-					result.UpdateIndices = append(result.UpdateIndices, srcIndex)
+					response.UpdateIndices = append(response.UpdateIndices, srcIndex)
 				} else {
-					result.EqualizedIndices = append(result.EqualizedIndices, srcIndex)
+					response.EqualizedIndices = append(response.EqualizedIndices, srcIndex)
 				}
 			}
 		}
-		// for each row in the source table that has not been matched, mark it for insertion
-		for _, srcIndex := range request.SourceIndices {
-			_, ok := matchedSourceIndices[srcIndex]
-			if !ok {
-				result.InsertIndices = append(result.InsertIndices, srcIndex)
-			}
+	}
+	// for each row in the source table that has not been matched, mark it for insertion
+	for _, srcIndex := range request.SourceIndices {
+		_, ok := matchedSourceIndices[srcIndex]
+		if !ok {
+			response.InsertIndices = append(response.InsertIndices, srcIndex)
 		}
-		// for each row in the target table that has not been matched, mark it for deletion
-		for _, tgtIndex := range request.TargetIndices {
-			_, ok := matchedTargetIndices[tgtIndex]
-			if !ok {
-				result.DeleteIndices = append(result.DeleteIndices, tgtIndex)
-			}
+	}
+	// for each row in the target table that has not been matched, mark it for deletion
+	for _, tgtIndex := range request.TargetIndices {
+		_, ok := matchedTargetIndices[tgtIndex]
+		if !ok {
+			response.DeleteIndices = append(response.DeleteIndices, tgtIndex)
 		}
 	}
 }
@@ -154,22 +149,18 @@ func CopyData(sourceData map[string][]interface{}, indices []int) map[string][]i
 	return data
 }
 
-func Equalize(sourceSpec, targetSpec *specs.TableSpec, sourceData, targetData interface{}) *EqualizeResult {
-	result := &EqualizeResult{
-		SourceSpec: sourceSpec,
-		TargetSpec: targetSpec,
-	}
+func Run(sourceSpec, targetSpec *specs.TableSpec, sourceData, targetData interface{}) (*EqualizeResult, error) {
+	result := &EqualizeResult{}
 
 	// check if the source and target tables are equalizable
 	equalizable, err := sourceSpec.Equalizable(targetSpec)
 	if err != nil {
-		result.Error = err
-		return result
+		return nil, err
 	}
 
 	if !equalizable {
-		result.Error = fmt.Errorf("source and target tables are not equalizable according to their specs")
-		return result
+		err = fmt.Errorf("source and target tables are not equalizable according to their specs")
+		return nil, err
 	}
 
 	// does source data needs to be transposed to column format
@@ -177,24 +168,17 @@ func Equalize(sourceSpec, targetSpec *specs.TableSpec, sourceData, targetData in
 	if sourceInRowFormat {
 		sourceData, err = transpose.RowsToColumns(sourceData)
 		if err != nil {
-			result.Error = err
-			return result
+			return nil, err
 		}
 	}
 	sourceMapOfArrays, ok := sourceData.(map[string][]interface{})
 	if !ok {
-		result.Error = fmt.Errorf("source data is not in column format")
-		return result
+		err = fmt.Errorf("source data is not in column format")
+		return nil, err
 	}
-	sourceColumnNames, err := GetColumnNames(sourceMapOfArrays)
+	sourceRowKeyHashes, err := ComputePartitionMap(sourceSpec, sourceMapOfArrays)
 	if err != nil {
-		result.Error = err
-		return result
-	}
-	sourceRowKeyHashes, err := ComputeRowKeyHashes(sourceSpec, sourceColumnNames, sourceMapOfArrays)
-	if err != nil {
-		result.Error = err
-		return result
+		return nil, err
 	}
 
 	// does target data needs to be transposed to column format
@@ -202,21 +186,19 @@ func Equalize(sourceSpec, targetSpec *specs.TableSpec, sourceData, targetData in
 	if targetInRowFormat {
 		targetData, err = transpose.RowsToColumns(targetData)
 		if err != nil {
-			result.Error = err
-			return result
+			return nil, err
 		}
 	}
 	targetMapOfArrays, ok := targetData.(map[string][]interface{})
 	if !ok {
-		result.Error = fmt.Errorf("target data is not in column format")
-		return result
+		err = fmt.Errorf("target data is not in column format")
+		return nil, err
 	}
-	targetColumnNames, err := GetColumnNames(targetMapOfArrays)
+
+	targetRowKeyHashes, err := ComputePartitionMap(targetSpec, targetMapOfArrays)
 	if err != nil {
-		result.Error = err
-		return result
+		return nil, err
 	}
-	targetRowKeyHashes, err := ComputeRowKeyHashes(targetSpec, targetColumnNames, targetMapOfArrays)
 
 	// merge the row key hashes
 	mergedRowKeyHashes := MergeRowKeyHashes(sourceRowKeyHashes, targetRowKeyHashes)
@@ -238,26 +220,27 @@ func Equalize(sourceSpec, targetSpec *specs.TableSpec, sourceData, targetData in
 		request.SourceIndices = sourceRowKeyHashes[currentHash]
 		request.TargetIndices = targetRowKeyHashes[currentHash]
 
+		fmt.Println("Processing partition " + fmt.Sprint(request.RowKeyHash))
+		fmt.Println("Source indices: " + fmt.Sprint(request.SourceIndices))
+		fmt.Println("Target indices: " + fmt.Sprint(request.TargetIndices))
 		ProcessPartition(&request, &response)
+		fmt.Println("Insert indices: " + fmt.Sprint(response.InsertIndices))
+		fmt.Println("Update indices: " + fmt.Sprint(response.UpdateIndices))
+		fmt.Println("Delete indices: " + fmt.Sprint(response.DeleteIndices))
+		fmt.Println("Equalized indices: " + fmt.Sprint(response.EqualizedIndices))
 
 		// copy the results
 		insertIndices = append(insertIndices, response.InsertIndices...)
 		updateIndices = append(updateIndices, response.UpdateIndices...)
 		deleteIndices = append(deleteIndices, response.DeleteIndices...)
 		equalizedIndices = append(equalizedIndices, response.EqualizedIndices...)
-
-		// clear the response. Make sure no aliasing is happening to the indices array
-		response.InsertIndices = response.InsertIndices[:0]
-		response.UpdateIndices = response.UpdateIndices[:0]
-		response.DeleteIndices = response.DeleteIndices[:0]
-		response.EqualizedIndices = response.EqualizedIndices[:0]
 	}
 
 	// append the results to the response
 	result.InsertData = CopyData(sourceMapOfArrays, insertIndices)
 	result.UpdateData = CopyData(sourceMapOfArrays, updateIndices)
-	result.InsertData = CopyData(targetMapOfArrays, deleteIndices)
+	result.DeleteData = CopyData(targetMapOfArrays, deleteIndices)
 	result.EqualizedData = CopyData(sourceMapOfArrays, equalizedIndices)
 
-	return result
+	return result, nil
 }
