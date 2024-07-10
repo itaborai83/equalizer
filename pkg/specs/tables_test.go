@@ -15,7 +15,7 @@ func TestGetColumnValue(t *testing.T) {
 		},
 	}
 
-	tableData := map[string]interface{}{
+	tableData := map[string][]interface{}{
 		"col1": []interface{}{"value1", "value2"},
 		"col2": []interface{}{1, 2},
 	}
@@ -111,12 +111,12 @@ func TestTableConformsTo(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		tableData    interface{}
+		tableData    map[string][]interface{}
 		expectedBool bool
 	}{
 		{
 			name: "Valid Data",
-			tableData: map[string]interface{}{
+			tableData: map[string][]interface{}{
 				"col1": []interface{}{"value1", "value2"},
 				"col2": []interface{}{1, 2},
 			},
@@ -124,22 +124,17 @@ func TestTableConformsTo(t *testing.T) {
 		},
 		{
 			name: "Missing Column",
-			tableData: map[string]interface{}{
+			tableData: map[string][]interface{}{
 				"col1": []interface{}{"value1", "value2"},
 			},
 			expectedBool: false,
 		},
 		{
 			name: "Invalid Column Type",
-			tableData: map[string]interface{}{
+			tableData: map[string][]interface{}{
 				"col1": []interface{}{"value1", "value2"},
 				"col2": []interface{}{"1", "2"},
 			},
-			expectedBool: false,
-		},
-		{
-			name:         "Invalid Data Type",
-			tableData:    "not a map",
 			expectedBool: false,
 		},
 	}
@@ -234,6 +229,217 @@ func TestEqualizable(t *testing.T) {
 				if tt.expectedError != nil {
 					t.Errorf("Index %d, Equalizable() error = nil, expected error '%v'", idx, tt.expectedError)
 				}
+			}
+		})
+	}
+}
+
+func TestSameKey(t *testing.T) {
+	// Define some sample columns for testing
+	col1 := ColumnSpec{Name: "col1", Type: ColumnTypeInteger}
+	col2 := ColumnSpec{Name: "col2", Type: ColumnTypeString}
+	col3 := ColumnSpec{Name: "col3", Type: ColumnTypeInteger}
+
+	table1 := TableSpec{
+		Name:                "table1",
+		Columns:             []ColumnSpec{col1, col2, col3},
+		KeyColumns:          []string{"col1"},
+		ChangeControlColumn: "col2",
+	}
+
+	table2 := TableSpec{
+		Name:                "table2",
+		Columns:             []ColumnSpec{col1, col2, col3},
+		KeyColumns:          []string{"col2"},
+		ChangeControlColumn: "col1",
+	}
+
+	table3 := TableSpec{
+		Name:                "table3",
+		Columns:             []ColumnSpec{col1, col2, col3},
+		KeyColumns:          []string{"col3"},
+		ChangeControlColumn: "col2",
+	}
+
+	tests := []struct {
+		name        string
+		sourceSpec  *TableSpec
+		targetSpec  *TableSpec
+		sourceData  map[string][]interface{}
+		targetData  map[string][]interface{}
+		sourceIndex int
+		targetIndex int
+		expected    bool
+	}{
+		{
+			name:        "Same key types and values",
+			sourceSpec:  &table1,
+			targetSpec:  &table3,
+			sourceData:  map[string][]interface{}{"col1": {1}},
+			targetData:  map[string][]interface{}{"col3": {1}},
+			sourceIndex: 0,
+			targetIndex: 0,
+			expected:    true,
+		},
+		{
+			name:        "Different key types, same values",
+			sourceSpec:  &table1,
+			targetSpec:  &table2,
+			sourceData:  map[string][]interface{}{"col1": {1}},
+			targetData:  map[string][]interface{}{"col2": {1}},
+			sourceIndex: 0,
+			targetIndex: 0,
+			expected:    false,
+		},
+		{
+			name:        "Same key types, different values",
+			sourceSpec:  &table1,
+			targetSpec:  &table1,
+			sourceData:  map[string][]interface{}{"col1": {1}},
+			targetData:  map[string][]interface{}{"col1": {2}},
+			sourceIndex: 0,
+			targetIndex: 0,
+			expected:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := SameKeys(tt.sourceSpec, tt.targetSpec, tt.sourceData, tt.targetData, tt.sourceIndex, tt.targetIndex)
+			if result != tt.expected {
+				t.Errorf("SameKey() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestNewerThan(t *testing.T) {
+	stringSpec := &TableSpec{
+		Columns: []ColumnSpec{
+			{Name: "id", Type: ColumnTypeInteger},
+			{Name: "updated_at", Type: ColumnTypeString},
+		},
+		KeyColumns:          []string{"id"},
+		ChangeControlColumn: "updated_at",
+	}
+
+	intSpec := &TableSpec{
+		Columns: []ColumnSpec{
+			{Name: "id", Type: ColumnTypeInteger},
+			{Name: "version", Type: ColumnTypeInteger},
+		},
+		KeyColumns:          []string{"id"},
+		ChangeControlColumn: "version",
+	}
+
+	floatSpec := &TableSpec{
+		Columns: []ColumnSpec{
+			{Name: "id", Type: ColumnTypeInteger},
+			{Name: "score", Type: ColumnTypeFloat},
+		},
+		KeyColumns:          []string{"id"},
+		ChangeControlColumn: "score",
+	}
+
+	mistypedSpec := &TableSpec{
+		Columns: []ColumnSpec{
+			{Name: "id", Type: ColumnTypeInteger},
+			{Name: "updated_at", Type: ColumnTypeInteger}, // wrong type
+		},
+		KeyColumns:          []string{"id"},
+		ChangeControlColumn: "updated_at",
+	}
+
+	boolSpec := &TableSpec{
+		Columns: []ColumnSpec{
+			{Name: "id", Type: ColumnTypeInteger},
+			{Name: "flag", Type: ColumnTypeBoolean},
+		},
+		KeyColumns:          []string{"id"},
+		ChangeControlColumn: "flag",
+	}
+
+	tests := []struct {
+		name        string
+		sourceSpec  *TableSpec
+		targetSpec  *TableSpec
+		sourceData  map[string][]interface{}
+		targetData  map[string][]interface{}
+		sourceIndex int
+		targetIndex int
+		expected    bool
+		shouldPanic bool
+	}{
+		{
+			name:        "String type - source newer",
+			sourceSpec:  stringSpec,
+			targetSpec:  stringSpec,
+			sourceData:  map[string][]interface{}{"updated_at": {"2023-07-10"}},
+			targetData:  map[string][]interface{}{"updated_at": {"2023-07-09"}},
+			sourceIndex: 0,
+			targetIndex: 0,
+			expected:    true,
+			shouldPanic: false,
+		},
+		{
+			name:        "Int type - source newer",
+			sourceSpec:  intSpec,
+			targetSpec:  intSpec,
+			sourceData:  map[string][]interface{}{"version": {2}},
+			targetData:  map[string][]interface{}{"version": {1}},
+			sourceIndex: 0,
+			targetIndex: 0,
+			expected:    true,
+			shouldPanic: false,
+		},
+		{
+			name:        "Float64 type - source newer or equal",
+			sourceSpec:  floatSpec,
+			targetSpec:  floatSpec,
+			sourceData:  map[string][]interface{}{"score": {90.5}, "id": {1}},
+			targetData:  map[string][]interface{}{"score": {90.0}, "id": {1}},
+			sourceIndex: 0,
+			targetIndex: 0,
+			expected:    true,
+			shouldPanic: false,
+		},
+		{
+			name:        "Different types",
+			sourceSpec:  stringSpec,
+			targetSpec:  mistypedSpec,
+			sourceData:  map[string][]interface{}{"updated_at": {"2023-07-10"}},
+			targetData:  map[string][]interface{}{"updated_at": {20230710}},
+			sourceIndex: 0,
+			targetIndex: 0,
+			expected:    false,
+			shouldPanic: true,
+		},
+		{
+			name:        "Bool type - should panic",
+			sourceSpec:  boolSpec,
+			targetSpec:  boolSpec,
+			sourceData:  map[string][]interface{}{"flag": {true}},
+			targetData:  map[string][]interface{}{"flag": {false}},
+			sourceIndex: 0,
+			targetIndex: 0,
+			expected:    false,
+			shouldPanic: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.shouldPanic {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("Expected panic but did not occur")
+					}
+				}()
+			}
+
+			result := NewerThan(tt.sourceSpec, tt.targetSpec, tt.sourceData, tt.targetData, tt.sourceIndex, tt.targetIndex)
+			if result != tt.expected && !tt.shouldPanic {
+				t.Errorf("NewerOrEqualsThan() = %v, want %v", result, tt.expected)
 			}
 		})
 	}

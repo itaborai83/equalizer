@@ -51,7 +51,7 @@ func (t *TableSpec) Equalizable(other *TableSpec) (bool, error) {
 	return true, nil
 }
 
-func (t *TableSpec) GetColumnValue(columnName string, rowIndex int, tableData map[string]interface{}) (interface{}, error) {
+func (t *TableSpec) GetColumnValue(columnName string, rowIndex int, tableData map[string][]interface{}) (interface{}, error) {
 	// get the column
 	column := t.GetColumn(columnName)
 	if column == nil {
@@ -77,15 +77,10 @@ func (t *TableSpec) GetColumn(name string) *ColumnSpec {
 	return nil
 }
 
-func (t *TableSpec) ConformsTo(data interface{}) bool {
-	// see if table data is a map
-	dataMap, ok := data.(map[string]interface{})
-	if !ok {
-		return false
-	}
+func (t *TableSpec) ConformsTo(data map[string][]interface{}) bool {
 	// see if all the columns are present
 	for _, col := range t.Columns {
-		if _, ok := dataMap[col.Name]; !ok {
+		if _, ok := data[col.Name]; !ok {
 			return false
 		}
 	}
@@ -96,4 +91,89 @@ func (t *TableSpec) ConformsTo(data interface{}) bool {
 		}
 	}
 	return true
+}
+
+func SameKeys(sourceSpec, targetSpec *TableSpec, sourceData, targetData map[string][]interface{}, sourceIndex, targetIndex int) bool {
+	// only works if the source and target spec are equalizable and source and target data conform to the specs
+	keyColumnCount := len(sourceSpec.KeyColumns)
+	for i := 0; i < keyColumnCount; i++ {
+		sourceKeyColumnName := sourceSpec.KeyColumns[i]
+		targetKeyColumnName := targetSpec.KeyColumns[i]
+		sourceColumn := sourceSpec.GetColumn(sourceKeyColumnName)
+		targetColumn := targetSpec.GetColumn(targetKeyColumnName)
+		if sourceColumn.Type != targetColumn.Type {
+			return false
+		}
+
+		sourceKeyColumnValue, err := sourceSpec.GetColumnValue(sourceKeyColumnName, sourceIndex, sourceData)
+		if err != nil {
+			return false
+		}
+		targetKeyColumnValue, err := targetSpec.GetColumnValue(targetKeyColumnName, targetIndex, targetData)
+		if err != nil {
+			return false
+		}
+
+		// same type?
+		if fmt.Sprintf("%T", sourceKeyColumnValue) != fmt.Sprintf("%T", targetKeyColumnValue) {
+			return false
+		}
+		// same value?
+		if sourceKeyColumnValue != targetKeyColumnValue {
+			return false
+		}
+	}
+	return true
+}
+
+func NewerThan(sourceSpec, targetSpec *TableSpec, sourceData, targetData map[string][]interface{}, sourceIndex, targetIndex int) bool {
+	// only works if the source and target spec are equalizable and source and target data conform to the specs
+	sourceChangeControleColumnName := sourceSpec.ChangeControlColumn
+	targetChangeControleColumnName := targetSpec.ChangeControlColumn
+
+	// if neither have a change control column, then the source is always newer
+	if sourceChangeControleColumnName == "" && targetChangeControleColumnName == "" {
+		return true
+	}
+
+	// if one has a change control column and the other does not, then the source is always newer
+	if sourceChangeControleColumnName == "" || targetChangeControleColumnName == "" {
+		panic("one has a change control column and the other does not. This should not happen since specs were supposed to be equalizable")
+	}
+
+	sourceChangeControlColumnValue, err := sourceSpec.GetColumnValue(sourceChangeControleColumnName, sourceIndex, sourceData)
+	if err != nil {
+		panic(err)
+	}
+	targetChangeControlColumnValue, err := targetSpec.GetColumnValue(targetChangeControleColumnName, targetIndex, targetData)
+	if err != nil {
+		panic(err)
+	}
+
+	sourceTypeName := fmt.Sprintf("%T", sourceChangeControlColumnValue)
+	targetTypeName := fmt.Sprintf("%T", targetChangeControlColumnValue)
+
+	// same type?
+	if sourceTypeName != targetTypeName {
+		panic("source type: " + sourceTypeName + " != target type: " + targetTypeName)
+	}
+
+	// string?
+	if sourceTypeName == "string" {
+		return sourceChangeControlColumnValue.(string) > targetChangeControlColumnValue.(string)
+	}
+	// int?
+	if sourceTypeName == "int" {
+		return sourceChangeControlColumnValue.(int) > targetChangeControlColumnValue.(int)
+	}
+	// float64?
+	if sourceTypeName == "float64" {
+		return sourceChangeControlColumnValue.(float64) > targetChangeControlColumnValue.(float64)
+	}
+	// bool?
+	if sourceTypeName == "bool" {
+		panic("bool not supported")
+	}
+	// unsupport type
+	panic("unknown type: " + sourceTypeName)
 }

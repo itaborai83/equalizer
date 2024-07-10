@@ -9,7 +9,7 @@ func TestGetValue(t *testing.T) {
 		name          string
 		columnSpec    ColumnSpec
 		rowIndex      int
-		columnValues  interface{}
+		columnValues  []interface{}
 		expectedValue interface{}
 		expectedError bool
 	}{
@@ -26,14 +26,6 @@ func TestGetValue(t *testing.T) {
 			columnSpec:    ColumnSpec{Name: "col1", Type: ColumnTypeString},
 			rowIndex:      2,
 			columnValues:  []interface{}{"test1", "test2"},
-			expectedValue: nil,
-			expectedError: true,
-		},
-		{
-			name:          "Invalid Column Values",
-			columnSpec:    ColumnSpec{Name: "col1", Type: ColumnTypeString},
-			rowIndex:      1,
-			columnValues:  "not an array",
 			expectedValue: nil,
 			expectedError: true,
 		},
@@ -147,31 +139,25 @@ func TestColumnsConformsTo(t *testing.T) {
 	tests := []struct {
 		name         string
 		columnSpec   ColumnSpec
-		tableData    interface{}
+		tableData    map[string][]interface{}
 		expectedBool bool
 	}{
 		{
 			name:         "Valid Data",
 			columnSpec:   ColumnSpec{Name: "col1", Type: ColumnTypeString},
-			tableData:    map[string]interface{}{"col1": []interface{}{"test1", "test2"}},
+			tableData:    map[string][]interface{}{"col1": []interface{}{"test1", "test2"}},
 			expectedBool: true,
-		},
-		{
-			name:         "Invalid Data Type",
-			columnSpec:   ColumnSpec{Name: "col1", Type: ColumnTypeString},
-			tableData:    map[string]interface{}{"col1": "not an array"},
-			expectedBool: false,
 		},
 		{
 			name:         "Invalid Column Name",
 			columnSpec:   ColumnSpec{Name: "col1", Type: ColumnTypeString},
-			tableData:    map[string]interface{}{"col2": []interface{}{"test1", "test2"}},
+			tableData:    map[string][]interface{}{"col2": []interface{}{"test1", "test2"}},
 			expectedBool: false,
 		},
 		{
 			name:         "Invalid Value Type",
 			columnSpec:   ColumnSpec{Name: "col1", Type: ColumnTypeInteger},
-			tableData:    map[string]interface{}{"col1": []interface{}{"test1", "test2"}},
+			tableData:    map[string][]interface{}{"col1": []interface{}{"test1", "test2"}},
 			expectedBool: false,
 		},
 	}
