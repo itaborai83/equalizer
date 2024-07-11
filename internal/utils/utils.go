@@ -1,9 +1,15 @@
 package utils
 
 import (
+	"bytes"
 	"encoding/json"
+	"log"
 	"os"
 	"path/filepath"
+)
+
+const (
+	BOM = "\xef\xbb\xbf"
 )
 
 func DoesDirectoryExist(dir string) bool {
@@ -25,18 +31,19 @@ func AssertCreateDirectory(dir string) error {
 }
 
 func ReadUntypedJsonFile(filePath string) (interface{}, error) {
-	file, err := os.Open(filePath)
+	// read all body
+	body, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	// trim the BOM mark
+	body = bytes.TrimPrefix(body, []byte(BOM))
 
 	var data interface{}
-	err = json.NewDecoder(file).Decode(&data)
+	err = json.Unmarshal(body, &data)
 	if err != nil {
 		return nil, err
 	}
-
 	return data, nil
 }
 
@@ -53,4 +60,9 @@ func WriteUntypedJsonFile(filePath string, data interface{}) error {
 		return err
 	}
 	return nil
+}
+
+func NewLogger(name string) *log.Logger {
+	// log to stdout
+	return log.New(os.Stdout, name+": ", log.LstdFlags)
 }

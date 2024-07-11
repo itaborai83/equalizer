@@ -14,7 +14,6 @@ type TableSpec struct {
 }
 
 func (t *TableSpec) Equalizable(other *TableSpec) (bool, error) {
-
 	// does the key column count match
 	if len(t.KeyColumns) != len(other.KeyColumns) {
 		return false, fmt.Errorf("key column count does not match: %d != %d", len(t.KeyColumns), len(other.KeyColumns))
@@ -43,10 +42,17 @@ func (t *TableSpec) Equalizable(other *TableSpec) (bool, error) {
 	if neitherHaveChangeControlColumn {
 		return true, nil
 	}
+
 	// does the change control column type match
-	myChangeControlColumn := t.GetColumn(t.ChangeControlColumn)
+	myChangeControlColumn := t.GetChangeControlColumn()
+	if myChangeControlColumn == nil {
+		return false, fmt.Errorf("source change control column not found: %s", t.ChangeControlColumn)
+	}
+	otherChangeControlColumn := other.GetChangeControlColumn()
+	if otherChangeControlColumn == nil {
+		return false, fmt.Errorf("target change control column not found: %s", other.ChangeControlColumn)
+	}
 	myChangeControlColumnType := myChangeControlColumn.Type
-	otherChangeControlColumn := other.GetColumn(other.ChangeControlColumn)
 	otherChangeControlColumnType := otherChangeControlColumn.Type
 	equalizable := myChangeControlColumnType == otherChangeControlColumnType
 	if !equalizable {
@@ -81,6 +87,10 @@ func (t *TableSpec) GetColumn(name string) *ColumnSpec {
 	return nil
 }
 
+func (t *TableSpec) GetChangeControlColumn() *ColumnSpec {
+	return t.GetColumn(t.ChangeControlColumn)
+}
+
 func (t *TableSpec) ConformsTo(data map[string][]interface{}) bool {
 	// see if all the columns are present
 	for _, col := range t.Columns {
@@ -95,6 +105,14 @@ func (t *TableSpec) ConformsTo(data map[string][]interface{}) bool {
 		}
 	}
 	return true
+}
+
+func (t *TableSpec) EmptyData() map[string][]interface{} {
+	data := make(map[string][]interface{})
+	for _, col := range t.Columns {
+		data[col.Name] = make([]interface{}, 0)
+	}
+	return data
 }
 
 func SameKeys(sourceSpec, targetSpec *TableSpec, sourceData, targetData map[string][]interface{}, sourceIndex, targetIndex int) bool {

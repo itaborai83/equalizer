@@ -3,6 +3,7 @@ package equalizer
 import (
 	"fmt"
 
+	"github.com/itaborai83/equalizer/internal/utils"
 	"github.com/itaborai83/equalizer/pkg/hasher"
 	"github.com/itaborai83/equalizer/pkg/specs"
 	"github.com/itaborai83/equalizer/pkg/transpose"
@@ -32,8 +33,23 @@ type PartitionAnalysisResult struct {
 	EqualizedIndices []int
 }
 
-func GetColumnNames(data map[string][]interface{}) ([]string, error) {
+var (
+	log = utils.NewLogger("equalizer")
+)
 
+func IsEmpty(data interface{}) bool {
+	aList, ok := data.([]interface{})
+	if ok {
+		return len(aList) == 0
+	}
+	aMap, ok := data.(map[string]interface{})
+	if ok {
+		return len(aMap) == 0
+	}
+	return true
+}
+
+func GetColumnNames(data map[string][]interface{}) ([]string, error) {
 	if len(data) == 0 {
 		return nil, fmt.Errorf("no data to get column names")
 	}
@@ -149,80 +165,98 @@ func CopyData(sourceData map[string][]interface{}, indices []int) map[string][]i
 	return data
 }
 
-func CastJsonToMapOfArrays(data interface{}) (map[string][]interface{}, error) {
-	dataTypeName := fmt.Sprintf("%T", data)
-	castedToMapOfArrays, ok := data.(map[string][]interface{})
-	if ok {
-		return castedToMapOfArrays, nil
-	}
-
-	castedToMap, ok := data.(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("data is not a map of arrays: %s", dataTypeName)
-	}
-	casted := make(map[string][]interface{})
-	for key, value := range castedToMap {
-		array, ok := value.([]interface{})
-		if !ok {
-			return nil, fmt.Errorf("value for key %s is not an array", key)
-		}
-		casted[key] = array
-	}
-	return casted, nil
-}
-
 func Run(sourceSpec, targetSpec *specs.TableSpec, sourceData, targetData interface{}) (*EqualizeResult, error) {
+	log.Println("equalizing data")
+	var msg string
 	result := &EqualizeResult{}
 
-	// check if the source and target tables are equalizable
+	log.Println("checking if source and target tables are equalizable")
 	equalizable, err := sourceSpec.Equalizable(targetSpec)
 	if err != nil {
 		return nil, err
 	}
 
 	if !equalizable {
-		err = fmt.Errorf("source and target tables are not equalizable according to their specs")
+		msg = "source and target tables are not equalizable according to their specs"
+		log.Print(msg)
+		err = fmt.Errorf(msg)
 		return nil, err
 	}
 
-	// does source data needs to be transposed to column format
-	sourceInRowFormat := transpose.IsInRowFormat(sourceData)
-	if sourceInRowFormat {
-		sourceData, err = transpose.RowsToColumns(sourceData)
+	isSourceEmpty := IsEmpty(sourceData)
+	isTargetEmpty := IsEmpty(targetData)
+	if isSourceEmpty && isTargetEmpty {
+		msg = "source and target data are empty"
+		log.Print(msg)
+		err = fmt.Errorf(msg)
+		return nil, err
+	}
+
+	var sourceMapOfArrays map[string][]interface{}
+	var targetMapOfArrays map[string][]interface{}
+
+	if !isSourceEmpty {
+		log.Println("converting source data to a map of string to array of interfaces")
+		sourceMapOfArrays, err = transpose.ConvertToColumnarFormat(sourceData)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("source data is not in column format: " + err.Error())
 		}
 	}
 
-	sourceMapOfArrays, err := CastJsonToMapOfArrays(sourceData)
-	if err != nil {
-		return nil, fmt.Errorf("source data is not in column format: " + err.Error())
+	if !isTargetEmpty {
+		log.Println("converting target data to a map of string to array of interfaces")
+		targetMapOfArrays, err = transpose.ConvertToColumnarFormat(targetData)
+		if err != nil {
+			return nil, fmt.Errorf("target data is not in column format: " + err.Error())
+		}
 	}
 
+	/*
+		if !sourceSpec.ConformsTo(sourceMapOfArrays) {
+			msg = "source data does not conform to the source spec"
+			log.Print(msg)
+			err = fmt.Errorf(msg)
+			return nil, err
+		}
+		if !targetSpec.ConformsTo(targetMapOfArrays) {
+			msg = "target data does not conform to the target spec"
+			log.Print(msg)
+			err = fmt.Errorf(msg)
+			return nil, err
+		}
+	*/
+
+	if isSourceEmpty {
+		log.Println("source data is empty. returning target data as delete data")
+		result.EqualizedData = sourceSpec.EmptyData()
+		result.UpdateData = sourceSpec.EmptyData()
+		result.InsertData = sourceSpec.EmptyData()
+		result.DeleteData = targetMapOfArrays
+		return result, nil
+	}
+
+	if isTargetEmpty {
+		log.Println("target data is empty. returning source data as insert data")
+		result.EqualizedData = sourceSpec.EmptyData()
+		result.UpdateData = sourceSpec.EmptyData()
+		result.InsertData = sourceMapOfArrays
+		result.DeleteData = targetSpec.EmptyData()
+		return result, nil
+	}
+
+	log.Println("computing partition map for source data")
 	sourceRowKeyHashes, err := ComputePartitionMap(sourceSpec, sourceMapOfArrays)
 	if err != nil {
 		return nil, err
 	}
 
-	// does target data needs to be transposed to column format
-	targetInRowFormat := transpose.IsInRowFormat(targetData)
-	if targetInRowFormat {
-		targetData, err = transpose.RowsToColumns(targetData)
-		if err != nil {
-			return nil, err
-		}
-	}
-	targetMapOfArrays, err := CastJsonToMapOfArrays(targetData)
-	if err != nil {
-		return nil, fmt.Errorf("target data is not in column format: " + err.Error())
-	}
-
+	log.Println("computing partition map for target data")
 	targetRowKeyHashes, err := ComputePartitionMap(targetSpec, targetMapOfArrays)
 	if err != nil {
 		return nil, err
 	}
 
-	// merge the row key hashes
+	log.Println("merging partion maps key hashes")
 	mergedRowKeyHashes := MergeRowKeyHashes(sourceRowKeyHashes, targetRowKeyHashes)
 
 	insertIndices := make([]int, 0)
@@ -237,19 +271,20 @@ func Run(sourceSpec, targetSpec *specs.TableSpec, sourceData, targetData interfa
 		TargetData: targetMapOfArrays,
 	}
 	var response PartitionAnalysisResult
+	log.Println("processing partitions")
 	for _, currentHash := range mergedRowKeyHashes {
 		request.RowKeyHash = currentHash
 		request.SourceIndices = sourceRowKeyHashes[currentHash]
 		request.TargetIndices = targetRowKeyHashes[currentHash]
 
-		fmt.Println("Processing partition " + fmt.Sprint(request.RowKeyHash))
-		fmt.Println("Source indices: " + fmt.Sprint(request.SourceIndices))
-		fmt.Println("Target indices: " + fmt.Sprint(request.TargetIndices))
+		log.Println("Processing partition " + fmt.Sprint(request.RowKeyHash))
+		log.Println("Source indices: " + fmt.Sprint(request.SourceIndices))
+		log.Println("Target indices: " + fmt.Sprint(request.TargetIndices))
 		ProcessPartition(&request, &response)
-		fmt.Println("Insert indices: " + fmt.Sprint(response.InsertIndices))
-		fmt.Println("Update indices: " + fmt.Sprint(response.UpdateIndices))
-		fmt.Println("Delete indices: " + fmt.Sprint(response.DeleteIndices))
-		fmt.Println("Equalized indices: " + fmt.Sprint(response.EqualizedIndices))
+		log.Println("Insert indices: " + fmt.Sprint(response.InsertIndices))
+		log.Println("Update indices: " + fmt.Sprint(response.UpdateIndices))
+		log.Println("Delete indices: " + fmt.Sprint(response.DeleteIndices))
+		log.Println("Equalized indices: " + fmt.Sprint(response.EqualizedIndices))
 
 		// copy the results
 		insertIndices = append(insertIndices, response.InsertIndices...)

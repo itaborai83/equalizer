@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -29,7 +30,12 @@ type Params struct {
 	TargetDataFile string
 }
 
+var (
+	logger = utils.NewLogger("equalizer")
+)
+
 func ParseParams() (Params, error) {
+	logger.Println("parsing command line arguments")
 	params := Params{}
 	flag.StringVar(&params.WorkDir, "work-dir", "", "working directory")
 	flag.StringVar(&params.SourceSpecFile, "source-spec", "", "source spec file")
@@ -77,21 +83,15 @@ func ParseParams() (Params, error) {
 }
 
 func createDirs(p Params) {
+	logger.Println("creating processed and error directories")
 	processedDir := filepath.Join(p.WorkDir, ProcessedDataDir)
 	errorDir := filepath.Join(p.WorkDir, ErrorDataDir)
 	utils.AssertCreateDirectory(processedDir)
 	utils.AssertCreateDirectory(errorDir)
 }
 
-func readSpecFile(filePath string) (*specs.TableSpec, error) {
-	spec, err := specs.ReadSpecFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("error reading spec file: %v", err)
-	}
-	return spec, nil
-}
-
 func moveAllFilesToDir(sourceDir, targetDir string) error {
+	logger.Println("moving all files from '" + sourceDir + "' to '" + targetDir + "'")
 	// does the source directory exist?
 	if !utils.DoesDirectoryExist(sourceDir) {
 		return fmt.Errorf("source directory does not exist: %s", sourceDir)
@@ -126,12 +126,14 @@ func moveAllFilesToDir(sourceDir, targetDir string) error {
 }
 
 func main() {
+	log.Println("starting equalizer")
 	// Parse command line arguments
 	params, err := ParseParams()
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}
+
 	createDirs(params)
 	processedDataDir := filepath.Join(params.WorkDir, ProcessedDataDir)
 	errorDataDir := filepath.Join(params.WorkDir, ErrorDataDir)
@@ -154,33 +156,59 @@ func main() {
 		}
 	}
 
+	log.Println("reading source spec file")
 	sourceSpec, err := specs.ReadSpecFile(sourceSpecPath)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		cleanUp()
 		os.Exit(1)
 	}
+	if sourceSpec == nil {
+		fmt.Printf("error: source spec is nil\n")
+		cleanUp()
+		os.Exit(1)
+	}
+
+	log.Println("reading target spec file")
 	targetSpec, err := specs.ReadSpecFile(targetSpecPath)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		cleanUp()
 		os.Exit(1)
 	}
+	if targetSpec == nil {
+		fmt.Printf("error: target spec is nil\n")
+		cleanUp()
+		os.Exit(1)
+	}
 
+	log.Println("reading source data path")
 	sourceData, err := utils.ReadUntypedJsonFile(sourceDataPath)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		cleanUp()
 		os.Exit(1)
 	}
+	if sourceData == nil {
+		fmt.Printf("error: source data is nil\n")
+		cleanUp()
+		os.Exit(1)
+	}
 
+	log.Println("reading target data path")
 	targetData, err := utils.ReadUntypedJsonFile(targetDataPath)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		cleanUp()
 		os.Exit(1)
 	}
+	if targetData == nil {
+		fmt.Printf("error: target data is nil\n")
+		cleanUp()
+		os.Exit(1)
+	}
 
+	log.Println("equalizing data")
 	result, err := equalizer.Run(sourceSpec, targetSpec, sourceData, targetData)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
@@ -188,6 +216,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	log.Println("writing insert data file")
 	err = utils.WriteUntypedJsonFile(insertDataFile, result.InsertData)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
@@ -195,6 +224,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	log.Println("writing update data file")
 	err = utils.WriteUntypedJsonFile(updateDataFile, result.UpdateData)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
@@ -202,6 +232,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	log.Println("writing delete data file")
 	err = utils.WriteUntypedJsonFile(deleteDataFile, result.DeleteData)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
@@ -209,6 +240,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	log.Println("writing equalized data file")
 	err = utils.WriteUntypedJsonFile(equalizedDataFile, result.EqualizedData)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
