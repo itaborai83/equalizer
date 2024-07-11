@@ -33,9 +33,9 @@ func TestGetValue(t *testing.T) {
 			name:          "Invalid Type",
 			columnSpec:    ColumnSpec{Name: "col1", Type: ColumnTypeInteger},
 			rowIndex:      1,
-			columnValues:  []interface{}{1, 2},
-			expectedValue: 2,
-			expectedError: false,
+			columnValues:  []interface{}{"1", "2"},
+			expectedValue: nil,
+			expectedError: true,
 		},
 		{
 			name:          "Valid Float",

@@ -108,17 +108,16 @@ func TestEqualize(t *testing.T) {
 	}
 
 	result, err := Run(sourceSpec, targetSpec, sourceMapOfArrays, targetMapOfArrays)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
 
 	fmt.Println("Equalize Run Result")
 	fmt.Println("EqualizedData: " + fmt.Sprint(result.EqualizedData))
 	fmt.Println("UpdatedData: " + fmt.Sprint(result.UpdateData))
 	fmt.Println("InsertedData: " + fmt.Sprint(result.InsertData))
 	fmt.Println("DeletedData: " + fmt.Sprint(result.DeleteData))
-
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-		return
-	}
 
 	expectedEqualizedData := map[string][]interface{}{
 		"id":         {1},

@@ -21,6 +21,10 @@ func (c *ColumnSpec) GetValue(rowIndex int, columnValues []interface{}) (interfa
 		}
 		return value, nil
 	case ColumnTypeInteger:
+		intValue, ok := columnValues[rowIndex].(int)
+		if ok {
+			return intValue, nil
+		}
 		floatValue, ok := columnValues[rowIndex].(float64)
 		if !ok {
 			return nil, fmt.Errorf("value is not an integer")

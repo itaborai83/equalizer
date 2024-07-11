@@ -190,7 +190,7 @@ func Run(sourceSpec, targetSpec *specs.TableSpec, sourceData, targetData interfa
 
 	sourceMapOfArrays, err := CastJsonToMapOfArrays(sourceData)
 	if err != nil {
-		return nil, fmt.Errorf("source data is not in column format")
+		return nil, fmt.Errorf("source data is not in column format: " + err.Error())
 	}
 
 	sourceRowKeyHashes, err := ComputePartitionMap(sourceSpec, sourceMapOfArrays)
@@ -208,7 +208,7 @@ func Run(sourceSpec, targetSpec *specs.TableSpec, sourceData, targetData interfa
 	}
 	targetMapOfArrays, err := CastJsonToMapOfArrays(targetData)
 	if err != nil {
-		return nil, fmt.Errorf("target data is not in column format")
+		return nil, fmt.Errorf("target data is not in column format: " + err.Error())
 	}
 
 	targetRowKeyHashes, err := ComputePartitionMap(targetSpec, targetMapOfArrays)
