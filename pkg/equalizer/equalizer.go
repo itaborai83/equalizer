@@ -150,9 +150,15 @@ func CopyData(sourceData map[string][]interface{}, indices []int) map[string][]i
 }
 
 func CastJsonToMapOfArrays(data interface{}) (map[string][]interface{}, error) {
+	dataTypeName := fmt.Sprintf("%T", data)
+	castedToMapOfArrays, ok := data.(map[string][]interface{})
+	if ok {
+		return castedToMapOfArrays, nil
+	}
+
 	castedToMap, ok := data.(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("data is not a map of arrays")
+		return nil, fmt.Errorf("data is not a map of arrays: %s", dataTypeName)
 	}
 	casted := make(map[string][]interface{})
 	for key, value := range castedToMap {
