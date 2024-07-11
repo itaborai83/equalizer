@@ -32,10 +32,10 @@ type Params struct {
 func ParseParams() (Params, error) {
 	params := Params{}
 	flag.StringVar(&params.WorkDir, "work-dir", "", "working directory")
-	flag.StringVar(&params.SourceSpecFile, "source-spec-file", "", "source spec file")
-	flag.StringVar(&params.TargetSpecFile, "target-spec-file", "", "target spec file")
-	flag.StringVar(&params.SourceDataFile, "source-data-file", "", "source data file")
-	flag.StringVar(&params.TargetDataFile, "target-data-file", "", "target data file")
+	flag.StringVar(&params.SourceSpecFile, "source-spec", "", "source spec file")
+	flag.StringVar(&params.TargetSpecFile, "target-spec", "", "target spec file")
+	flag.StringVar(&params.SourceDataFile, "source-data", "", "source data file")
+	flag.StringVar(&params.TargetDataFile, "target-data", "", "target data file")
 	flag.Parse()
 
 	if params.WorkDir == "" {
@@ -83,7 +83,7 @@ func createDirs(p Params) {
 	utils.AssertCreateDirectory(errorDir)
 }
 
-func readSpecFile(filePath string) (*specs.TableSpec, err) {
+func readSpecFile(filePath string) (*specs.TableSpec, error) {
 	spec, err := specs.ReadSpecFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("error reading spec file: %v", err)
@@ -145,7 +145,6 @@ func main() {
 	insertDataFile := filepath.Join(params.WorkDir, ProcessedDataDir, InsertDataFile)
 	deleteDataFile := filepath.Join(params.WorkDir, ProcessedDataDir, DeleteDataFile)
 
-	error := false
 	// defer moving all files to error_data if there is an error
 	cleanUp := func() {
 		err := moveAllFilesToDir(params.WorkDir, errorDataDir)

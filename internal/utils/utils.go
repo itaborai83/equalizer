@@ -42,19 +42,13 @@ func ReadUntypedJsonFile(filePath string) (interface{}, error) {
 
 func WriteUntypedJsonFile(filePath string, data interface{}) error {
 	// write to a temporary file first
-	tempFilePath := filePath + ".tmp"
-	file, err := os.Create(tempFilePath)
+	file, err := os.Create(filePath)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 	// write to the temporary file
 	err = json.NewEncoder(file).Encode(data)
-	if err != nil {
-		return err
-	}
-	// rename the temporary file to the target file
-	err = os.Rename(tempFilePath, filePath)
 	if err != nil {
 		return err
 	}

@@ -149,6 +149,22 @@ func CopyData(sourceData map[string][]interface{}, indices []int) map[string][]i
 	return data
 }
 
+func CastJsonToMapOfArrays(data interface{}) (map[string][]interface{}, error) {
+	castedToMap, ok := data.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("data is not a map of arrays")
+	}
+	casted := make(map[string][]interface{})
+	for key, value := range castedToMap {
+		array, ok := value.([]interface{})
+		if !ok {
+			return nil, fmt.Errorf("value for key %s is not an array", key)
+		}
+		casted[key] = array
+	}
+	return casted, nil
+}
+
 func Run(sourceSpec, targetSpec *specs.TableSpec, sourceData, targetData interface{}) (*EqualizeResult, error) {
 	result := &EqualizeResult{}
 
@@ -171,11 +187,12 @@ func Run(sourceSpec, targetSpec *specs.TableSpec, sourceData, targetData interfa
 			return nil, err
 		}
 	}
-	sourceMapOfArrays, ok := sourceData.(map[string][]interface{})
-	if !ok {
-		err = fmt.Errorf("source data is not in column format")
-		return nil, err
+
+	sourceMapOfArrays, err := CastJsonToMapOfArrays(sourceData)
+	if err != nil {
+		return nil, fmt.Errorf("source data is not in column format")
 	}
+
 	sourceRowKeyHashes, err := ComputePartitionMap(sourceSpec, sourceMapOfArrays)
 	if err != nil {
 		return nil, err
@@ -189,10 +206,9 @@ func Run(sourceSpec, targetSpec *specs.TableSpec, sourceData, targetData interfa
 			return nil, err
 		}
 	}
-	targetMapOfArrays, ok := targetData.(map[string][]interface{})
-	if !ok {
-		err = fmt.Errorf("target data is not in column format")
-		return nil, err
+	targetMapOfArrays, err := CastJsonToMapOfArrays(targetData)
+	if err != nil {
+		return nil, fmt.Errorf("target data is not in column format")
 	}
 
 	targetRowKeyHashes, err := ComputePartitionMap(targetSpec, targetMapOfArrays)

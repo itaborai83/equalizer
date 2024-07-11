@@ -13,7 +13,6 @@ func (c *ColumnSpec) GetValue(rowIndex int, columnValues []interface{}) (interfa
 		return nil, fmt.Errorf("row index out of bounds: %d", rowIndex)
 	}
 	// test if value conforms to column type
-
 	switch c.Type {
 	case ColumnTypeString, ColumnTypeDate, ColumnTypeDateTime:
 		value, ok := columnValues[rowIndex].(string)
@@ -22,10 +21,11 @@ func (c *ColumnSpec) GetValue(rowIndex int, columnValues []interface{}) (interfa
 		}
 		return value, nil
 	case ColumnTypeInteger:
-		value, ok := columnValues[rowIndex].(int)
+		floatValue, ok := columnValues[rowIndex].(float64)
 		if !ok {
 			return nil, fmt.Errorf("value is not an integer")
 		}
+		value := int(floatValue)
 		return value, nil
 	case ColumnTypeFloat:
 		value, ok := columnValues[rowIndex].(float64)
