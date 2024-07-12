@@ -63,7 +63,6 @@ func WriteUntypedJsonFile(filePath string, data interface{}) error {
 }
 
 func NewLogger(name string) *log.Logger {
-	// log to stdout
 	return log.New(os.Stdout, name+": ", log.LstdFlags)
 }
 

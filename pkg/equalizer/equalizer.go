@@ -6,7 +6,7 @@ import (
 	"github.com/itaborai83/equalizer/internal/utils"
 	"github.com/itaborai83/equalizer/pkg/hasher"
 	"github.com/itaborai83/equalizer/pkg/specs"
-	"github.com/itaborai83/equalizer/pkg/transpose"
+	"github.com/itaborai83/equalizer/pkg/transposer"
 )
 
 type EqualizeResult struct {
@@ -42,24 +42,20 @@ func IsEmpty(data interface{}) bool {
 	if ok {
 		return len(aList) == 0
 	}
+	anotherList, ok := data.([]map[string]interface{})
+	if ok {
+		return len(anotherList) == 0
+	}
+
 	aMap, ok := data.(map[string]interface{})
 	if ok {
 		return len(aMap) == 0
 	}
-	return true
-}
-
-func GetColumnNames(data map[string][]interface{}) ([]string, error) {
-	if len(data) == 0 {
-		return nil, fmt.Errorf("no data to get column names")
+	anotherMap, ok := data.(map[string][]interface{})
+	if ok {
+		return len(anotherMap) == 0
 	}
-	columnNames := make([]string, len(data))
-	i := 0
-	for columnName := range data {
-		columnNames[i] = columnName
-		i++
-	}
-	return columnNames, nil
+	panic("data is not a list or a map")
 }
 
 func ComputeRowKeyHash(h *hasher.Hasher, spec *specs.TableSpec, data map[string][]interface{}, rowIndex int) (uint64, error) {
@@ -75,9 +71,9 @@ func ComputeRowKeyHash(h *hasher.Hasher, spec *specs.TableSpec, data map[string]
 }
 
 func ComputePartitionMap(spec *specs.TableSpec, data map[string][]interface{}) (map[uint64][]int, error) {
-	columnNames, err := GetColumnNames(data)
-	if err != nil {
-		return nil, err
+	columnNames := make([]string, 0)
+	for _, column := range spec.Columns {
+		columnNames = append(columnNames, column.Name)
 	}
 	hashes := make(map[uint64][]int)
 	hasher := hasher.NewHasher()
@@ -95,11 +91,11 @@ func ComputePartitionMap(spec *specs.TableSpec, data map[string][]interface{}) (
 func MergeRowKeyHashes(sourceRowKeyHashes, targetRowKeyHashes map[uint64][]int) []uint64 {
 	seen := make(map[uint64]bool)
 	merged := make([]uint64, 0)
-	for hash, _ := range sourceRowKeyHashes {
+	for hash := range sourceRowKeyHashes {
 		merged = append(merged, hash)
 		seen[hash] = true
 	}
-	for hash, _ := range targetRowKeyHashes {
+	for hash := range targetRowKeyHashes {
 		_, ok := seen[hash]
 		if !ok {
 			merged = append(merged, hash)
@@ -192,57 +188,88 @@ func Run(sourceSpec, targetSpec *specs.TableSpec, sourceData, targetData interfa
 		return nil, err
 	}
 
+	isSourceColumnar := transposer.IsInColumnFormat(sourceData)
+	isSourceRow := transposer.IsInRowFormat(sourceData)
+	isTargetColumnar := transposer.IsInColumnFormat(targetData)
+	isTargetRow := transposer.IsInRowFormat(targetData)
+
+	if !isSourceColumnar && !isSourceRow {
+		msg = "source data is not in columnar or row format"
+		log.Print(msg)
+		err = fmt.Errorf(msg)
+		return nil, err
+	}
+
+	if !isTargetColumnar && !isTargetRow {
+		msg = "target data is not in columnar or row format"
+		log.Print(msg)
+		err = fmt.Errorf(msg)
+		return nil, err
+	}
+
 	var sourceMapOfArrays map[string][]interface{}
 	var targetMapOfArrays map[string][]interface{}
 
 	if !isSourceEmpty {
 		log.Println("converting source data to a map of string to array of interfaces")
-		sourceMapOfArrays, err = transpose.ConvertToColumnarFormat(sourceData)
+		sourceMapOfArrays, err = transposer.ConvertToColumnarFormat(sourceSpec, sourceData)
 		if err != nil {
-			return nil, fmt.Errorf("source data is not in column format: " + err.Error())
+			return nil, fmt.Errorf("source data error: " + err.Error())
 		}
 	}
 
 	if !isTargetEmpty {
 		log.Println("converting target data to a map of string to array of interfaces")
-		targetMapOfArrays, err = transpose.ConvertToColumnarFormat(targetData)
+		targetMapOfArrays, err = transposer.ConvertToColumnarFormat(targetSpec, targetData)
 		if err != nil {
-			return nil, fmt.Errorf("target data is not in column format: " + err.Error())
+			return nil, fmt.Errorf("target data error: " + err.Error())
 		}
-	}
-
-	/*
-		if !sourceSpec.ConformsTo(sourceMapOfArrays) {
-			msg = "source data does not conform to the source spec"
-			log.Print(msg)
-			err = fmt.Errorf(msg)
-			return nil, err
-		}
-		if !targetSpec.ConformsTo(targetMapOfArrays) {
-			msg = "target data does not conform to the target spec"
-			log.Print(msg)
-			err = fmt.Errorf(msg)
-			return nil, err
-		}
-	*/
-
-	if isSourceEmpty {
-		log.Println("source data is empty. returning target data as delete data")
-		result.EqualizedData = sourceSpec.NewColumnarTable()
-		result.UpdateData = sourceSpec.NewColumnarTable()
-		result.InsertData = sourceSpec.NewColumnarTable()
-		result.DeleteData = targetMapOfArrays
-		return result, nil
 	}
 
 	if isTargetEmpty {
 		log.Println("target data is empty. returning source data as insert data")
-		result.EqualizedData = sourceSpec.NewColumnarTable()
-		result.UpdateData = sourceSpec.NewColumnarTable()
-		result.InsertData = sourceMapOfArrays
-		result.DeleteData = targetSpec.NewColumnarTable()
-		return result, nil
+
+		if isTargetColumnar && isSourceColumnar {
+			result.EqualizedData = sourceSpec.NewColumnarTable()
+			result.UpdateData = sourceSpec.NewColumnarTable()
+			result.DeleteData = targetSpec.NewColumnarTable()
+			result.InsertData = sourceData
+			return result, nil
+		}
+
+		if isTargetColumnar && isSourceRow {
+			result.EqualizedData = sourceSpec.NewColumnarTable()
+			result.UpdateData = sourceSpec.NewColumnarTable()
+			result.DeleteData = targetSpec.NewColumnarTable()
+			result.InsertData = sourceMapOfArrays
+			return result, nil
+		}
+
+		if isTargetRow && isSourceRow {
+			result.EqualizedData = []interface{}{}
+			result.UpdateData = []interface{}{}
+			result.DeleteData = []interface{}{}
+			result.InsertData = sourceData
+			return result, nil
+		}
+
+		if isTargetRow && isSourceColumnar {
+			result.EqualizedData = []interface{}{}
+			result.UpdateData = []interface{}{}
+			result.DeleteData = []interface{}{}
+			result.InsertData, err = transposer.ConvertToRowFormat(sourceSpec, sourceMapOfArrays)
+			if err != nil {
+				return nil, fmt.Errorf("source data error: " + err.Error())
+			}
+			return result, nil
+		}
+		panic("not implemented yet")
+
+	} else {
+		panic("not implemented yet")
 	}
+
+	panic("CCCC")
 
 	log.Println("computing partition map for source data")
 	sourceRowKeyHashes, err := ComputePartitionMap(sourceSpec, sourceMapOfArrays)

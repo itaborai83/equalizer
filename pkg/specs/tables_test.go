@@ -141,7 +141,7 @@ func TestTableConformsTo(t *testing.T) {
 
 	for idx, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := table.ConformsTo(tt.tableData); got != tt.expectedBool {
+			if got := table.ConformsToColumnar(tt.tableData); got != tt.expectedBool {
 				t.Errorf("Index: %d, ConformsTo() = %v, expectedBool %v", idx, got, tt.expectedBool)
 			}
 		})

@@ -91,7 +91,7 @@ func (t *TableSpec) GetChangeControlColumn() *ColumnSpec {
 	return t.GetColumn(t.ChangeControlColumn)
 }
 
-func (t *TableSpec) ConformsTo(data map[string][]interface{}) bool {
+func (t *TableSpec) ConformsToColumnar(data map[string][]interface{}) bool {
 	// see if all the columns are present
 	for _, col := range t.Columns {
 		if _, ok := data[col.Name]; !ok {
@@ -102,6 +102,30 @@ func (t *TableSpec) ConformsTo(data map[string][]interface{}) bool {
 	for _, col := range t.Columns {
 		if !col.ConformsTo(data) {
 			return false
+		}
+	}
+	return true
+}
+
+func (t *TableSpec) ConformsToRows(data []map[string]interface{}) bool {
+	// index columns for fast lookup
+	columns := make(map[string]ColumnSpec)
+	for _, col := range t.Columns {
+		columns[col.Name] = col
+	}
+
+	// for each row
+	for _, row := range data {
+		// see if all the columns conform to the column types
+		for fieldName, fieldValue := range row {
+			col, ok := columns[fieldName]
+			if !ok {
+				// ignore the column if it is not in the spec
+				continue
+			}
+			if !col.IsValidValue(fieldValue) {
+				return false
+			}
 		}
 	}
 	return true

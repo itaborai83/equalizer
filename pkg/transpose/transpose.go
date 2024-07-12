@@ -69,8 +69,6 @@ func IsInRowFormat(data interface{}) bool {
 }
 
 func IsInColumnFormat(data interface{}) bool {
-	dataTypeName := fmt.Sprintf("%T", data)
-	fmt.Println(dataTypeName)
 	_, ok := data.(map[string][]interface{})
 	if ok {
 		return true

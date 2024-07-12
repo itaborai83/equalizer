@@ -10,6 +10,8 @@ func IsInRowFormat(data interface{}) bool {
 	switch data.(type) {
 	case []interface{}:
 		return true
+	case []map[string]interface{}:
+		return true
 	default:
 		return false
 	}
@@ -18,6 +20,8 @@ func IsInRowFormat(data interface{}) bool {
 func IsInColumnFormat(data interface{}) bool {
 	switch data.(type) {
 	case map[string]interface{}:
+		return true
+	case map[string][]interface{}:
 		return true
 	default:
 		return false
@@ -64,6 +68,22 @@ func RowsToColumns(spec *specs.TableSpec, data interface{}) (map[string][]interf
 			// add the value to the column
 			result[fieldName] = append(result[fieldName], fieldValue)
 		}
+	}
+	return result, nil
+}
+
+func castJsonArrayToRowTable(data interface{}) ([]map[string]interface{}, error) {
+	arrayOfMaps, ok := data.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("data is not in row format")
+	}
+	result := make([]map[string]interface{}, 0)
+	for idx, row := range arrayOfMaps {
+		row, ok := row.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("data is not in row format: row '%d' is not a map", idx)
+		}
+		result = append(result, row)
 	}
 	return result, nil
 }
@@ -144,4 +164,39 @@ func ColumnsToRows(spec *specs.TableSpec, data interface{}) ([]map[string]interf
 		result = append(result, newRow)
 	}
 	return result, nil
+}
+
+func ConvertToColumnarFormat(spec *specs.TableSpec, data interface{}) (map[string][]interface{}, error) {
+	if IsInRowFormat(data) {
+		return RowsToColumns(spec, data)
+
+	} else if IsInColumnFormat(data) {
+		mapOfArrays, err := castJsonMapToColumnarTable(data)
+		if err != nil {
+			return nil, err
+		}
+		ok := spec.ConformsToColumnar(mapOfArrays)
+		if !ok {
+			return nil, fmt.Errorf("data does not conform to the spec")
+		}
+		return mapOfArrays, nil
+	}
+	return nil, fmt.Errorf("data is not in row or column format")
+}
+
+func ConvertToRowFormat(spec *specs.TableSpec, data interface{}) ([]map[string]interface{}, error) {
+	if IsInColumnFormat(data) {
+		return ColumnsToRows(spec, data)
+
+	} else if IsInRowFormat(data) {
+		arrayOfMaps, err := castJsonArrayToRowTable(data)
+		if err != nil {
+			return nil, err
+		}
+		ok := spec.ConformsToRows(arrayOfMaps)
+		if !ok {
+			return nil, fmt.Errorf("data does not conform to the spec")
+		}
+	}
+	return nil, fmt.Errorf("data is not in row or column format")
 }
