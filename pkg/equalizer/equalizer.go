@@ -373,11 +373,43 @@ func Run(sourceSpec, targetSpec *specs.TableSpec, sourceData, targetData interfa
 		equalizedIndices = append(equalizedIndices, response.EqualizedIndices...)
 	}
 
-	// append the results to the response
-	result.InsertData = CopyData(sourceMapOfArrays, insertIndices)
-	result.UpdateData = CopyData(sourceMapOfArrays, updateIndices)
-	result.DeleteData = CopyData(targetMapOfArrays, deleteIndices)
-	result.EqualizedData = CopyData(sourceMapOfArrays, equalizedIndices)
+	// append the results to the response and return
 
+	if isTargetColumnar {
+		result.InsertData = CopyData(sourceMapOfArrays, insertIndices)
+		result.UpdateData = CopyData(sourceMapOfArrays, updateIndices)
+		result.DeleteData = CopyData(targetMapOfArrays, deleteIndices)
+		result.EqualizedData = CopyData(sourceMapOfArrays, equalizedIndices)
+
+	} else {
+		var tmp interface{}
+		// insert data
+		tmp, err = transposer.ConvertToRowFormat(sourceSpec, CopyData(sourceMapOfArrays, insertIndices))
+		if err != nil {
+			return nil, fmt.Errorf("error transposing insert data result: " + err.Error())
+		}
+		result.InsertData = tmp
+
+		// update data
+		tmp, err = transposer.ConvertToRowFormat(sourceSpec, CopyData(sourceMapOfArrays, updateIndices))
+		if err != nil {
+			return nil, fmt.Errorf("error transposing update data result: " + err.Error())
+		}
+		result.UpdateData = tmp
+
+		// delete data
+		tmp, err = transposer.ConvertToRowFormat(targetSpec, CopyData(targetMapOfArrays, deleteIndices))
+		if err != nil {
+			return nil, fmt.Errorf("error transposing delete data result: " + err.Error())
+		}
+		result.DeleteData = tmp
+
+		// equalized data
+		tmp, err = transposer.ConvertToRowFormat(sourceSpec, CopyData(sourceMapOfArrays, equalizedIndices))
+		if err != nil {
+			return nil, fmt.Errorf("error transposing equalized data result: " + err.Error())
+		}
+		result.EqualizedData = tmp
+	}
 	return result, nil
 }
