@@ -228,19 +228,19 @@ func Run(sourceSpec, targetSpec *specs.TableSpec, sourceData, targetData interfa
 
 	if isSourceEmpty {
 		log.Println("source data is empty. returning target data as delete data")
-		result.EqualizedData = sourceSpec.NewEmptyData()
-		result.UpdateData = sourceSpec.NewEmptyData()
-		result.InsertData = sourceSpec.NewEmptyData()
+		result.EqualizedData = sourceSpec.NewColumnarTable()
+		result.UpdateData = sourceSpec.NewColumnarTable()
+		result.InsertData = sourceSpec.NewColumnarTable()
 		result.DeleteData = targetMapOfArrays
 		return result, nil
 	}
 
 	if isTargetEmpty {
 		log.Println("target data is empty. returning source data as insert data")
-		result.EqualizedData = sourceSpec.NewEmptyData()
-		result.UpdateData = sourceSpec.NewEmptyData()
+		result.EqualizedData = sourceSpec.NewColumnarTable()
+		result.UpdateData = sourceSpec.NewColumnarTable()
 		result.InsertData = sourceMapOfArrays
-		result.DeleteData = targetSpec.NewEmptyData()
+		result.DeleteData = targetSpec.NewColumnarTable()
 		return result, nil
 	}
 

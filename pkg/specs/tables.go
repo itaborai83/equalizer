@@ -107,10 +107,18 @@ func (t *TableSpec) ConformsTo(data map[string][]interface{}) bool {
 	return true
 }
 
-func (t *TableSpec) NewEmptyData() map[string][]interface{} {
+func (t *TableSpec) NewColumnarTable() map[string][]interface{} {
 	data := make(map[string][]interface{})
 	for _, col := range t.Columns {
 		data[col.Name] = make([]interface{}, 0)
+	}
+	return data
+}
+
+func (t *TableSpec) NewRow() map[string]interface{} {
+	data := make(map[string]interface{})
+	for _, col := range t.Columns {
+		data[col.Name] = nil
 	}
 	return data
 }
