@@ -55,14 +55,20 @@ func (c *ColumnSpec) IsValidValue(value interface{}) bool {
 		return ok
 	case ColumnTypeInteger:
 		_, ok := value.(int)
+		if !ok {
+			aFloat, ok := value.(float64)
+			if ok {
+				return aFloat == float64(int(aFloat))
+			}
+		}
 		return ok
 	case ColumnTypeFloat:
 		_, ok := value.(float64)
 		return ok
-	case ColumnTypeDate:
+	case ColumnTypeDate: // TODO: add date regex
 		_, ok := value.(string)
 		return ok
-	case ColumnTypeDateTime:
+	case ColumnTypeDateTime: // TODO: add datetime regex
 		_, ok := value.(string)
 		return ok
 	case ColumnTypeBoolean:

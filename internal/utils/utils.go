@@ -66,3 +66,17 @@ func NewLogger(name string) *log.Logger {
 	// log to stdout
 	return log.New(os.Stdout, name+": ", log.LstdFlags)
 }
+
+func RecursiveUntypedEquals(a, b interface{}) bool {
+	// this is a hack ... the values are equal if their json representation are equal
+	// this is not a perfect solution but it works for now
+	aAsJson, err := json.Marshal(a)
+	if err != nil {
+		return false
+	}
+	bAsJson, err := json.Marshal(b)
+	if err != nil {
+		return false
+	}
+	return string(aAsJson) == string(bAsJson)
+}
