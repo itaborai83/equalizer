@@ -253,6 +253,234 @@ func TestEqualizeFilledColumnarSourceEmptyRowTarget(t *testing.T) {
 	}
 }
 
+// A - Source: empty, Target: filled
+// B - Source: columnar, Target: columnar
+func TestEqualizeEmptyColumnarSourceFilledColumnarTarget(t *testing.T) {
+	sourceData := parseJsonOrPanic(`{}`)
+	targetPayload := `{
+		"id": [1, 2, 3],
+		"updated_at": ["2020-01-01", "2020-01-02", "2020-01-03"]
+	}`
+	targetData := parseJsonOrPanic(targetPayload)
+	expectedEqualizedData := sourceSpec.NewColumnarTable()
+	expectedUpdateData := sourceSpec.NewColumnarTable()
+	expectedInsertedData := sourceSpec.NewColumnarTable()
+	expectedDeletedData := map[string][]interface{}{
+		"id":         {1, 2, 3},
+		"updated_at": {"2020-01-01", "2020-01-02", "2020-01-03"},
+	}
+
+	result, err := Run(sourceSpec, targetSpec, sourceData, targetData)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+
+	equalizedEquals := utils.RecursiveUntypedEquals(result.EqualizedData, expectedEqualizedData)
+	if !equalizedEquals {
+		t.Errorf("expected EqualizedData '%v', got '%v'", expectedEqualizedData, result.EqualizedData)
+	}
+
+	updateEquals := utils.RecursiveUntypedEquals(result.UpdateData, expectedUpdateData)
+	if !updateEquals {
+		t.Errorf("expected UpdateData '%v', got '%v'", expectedUpdateData, result.UpdateData)
+	}
+
+	deletedEquals := utils.RecursiveUntypedEquals(result.DeleteData, expectedDeletedData)
+	if !deletedEquals {
+		t.Errorf("expected DeletedData '%v', got '%v'", expectedDeletedData, result.DeleteData)
+	}
+
+	insertedEquals := utils.RecursiveUntypedEquals(result.InsertData, expectedInsertedData)
+	if !insertedEquals {
+		t.Errorf("expected InsertedData '%v', got '%v'", expectedInsertedData, result.InsertData)
+	}
+}
+
+// A - Source: empty, Target: filled
+// B - Source: columnar, Target: row
+func TestEqualizedEmptyColumnarSourceFilledRowTarget(t *testing.T) {
+	sourceData := parseJsonOrPanic(`{}`)
+	targetPayload := `[
+		{ "id": 1, "updated_at": "2020-01-01" },
+		{ "id": 2, "updated_at": "2020-01-02" },
+		{ "id": 3, "updated_at": "2020-01-03" }
+	]`
+	targetData := parseJsonOrPanic(targetPayload)
+	expectedEqualizedData := []interface{}{}
+	expectedUpdateData := []interface{}{}
+	expectedInsertedData := []interface{}{}
+	expectedDeletedData := []map[string]interface{}{
+		{"id": 1, "updated_at": "2020-01-01"},
+		{"id": 2, "updated_at": "2020-01-02"},
+		{"id": 3, "updated_at": "2020-01-03"},
+	}
+
+	result, err := Run(sourceSpec, targetSpec, sourceData, targetData)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+
+	equalizedEquals := utils.RecursiveUntypedEquals(result.EqualizedData, expectedEqualizedData)
+	if !equalizedEquals {
+		t.Errorf("expected EqualizedData '%v', got '%v'", expectedEqualizedData, result.EqualizedData)
+	}
+
+	updateEquals := utils.RecursiveUntypedEquals(result.UpdateData, expectedUpdateData)
+	if !updateEquals {
+		t.Errorf("expected UpdateData '%v', got '%v'", expectedUpdateData, result.UpdateData)
+	}
+
+	deletedEquals := utils.RecursiveUntypedEquals(result.DeleteData, expectedDeletedData)
+	if !deletedEquals {
+		t.Errorf("expected DeletedData '%v', got '%v'", expectedDeletedData, result.DeleteData)
+	}
+
+	insertedEquals := utils.RecursiveUntypedEquals(result.InsertData, expectedInsertedData)
+	if !insertedEquals {
+		t.Errorf("expected InsertedData '%v', got '%v'", expectedInsertedData, result.InsertData)
+	}
+}
+
+// A - Source: empty, Target: filled
+// B - Source: row, Target: row
+func TestEqualizeEmptyRowSourceFilledRowTarget(t *testing.T) {
+	sourceData := parseJsonOrPanic(`[]`)
+	targetPayload := `[
+		{ "id": 1, "name": "Alice", "updated_at": "2020-01-01" },
+		{ "id": 2, "name": "Bob", "updated_at": "2020-01-02" },
+		{ "id": 3, "name": "Charlie", "updated_at": "2020-01-03" }
+	]`
+	targetData := parseJsonOrPanic(targetPayload)
+	expectedEqualizedData := []interface{}{}
+	expectedUpdateData := []interface{}{}
+	expectedInsertedData := []interface{}{}
+	expectedDeletedData := []map[string]interface{}{
+		{"id": 1, "name": "Alice", "updated_at": "2020-01-01"},
+		{"id": 2, "name": "Bob", "updated_at": "2020-01-02"},
+		{"id": 3, "name": "Charlie", "updated_at": "2020-01-03"},
+	}
+
+	result, err := Run(sourceSpec, targetSpec, sourceData, targetData)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+
+	equalizedEquals := utils.RecursiveUntypedEquals(result.EqualizedData, expectedEqualizedData)
+	if !equalizedEquals {
+		t.Errorf("expected EqualizedData '%v', got '%v'", expectedEqualizedData, result.EqualizedData)
+	}
+
+	updateEquals := utils.RecursiveUntypedEquals(result.UpdateData, expectedUpdateData)
+	if !updateEquals {
+		t.Errorf("expected UpdateData '%v', got '%v'", expectedUpdateData, result.UpdateData)
+	}
+
+	deletedEquals := utils.RecursiveUntypedEquals(result.DeleteData, expectedDeletedData)
+	if !deletedEquals {
+		t.Errorf("expected DeletedData '%v', got '%v'", expectedDeletedData, result.DeleteData)
+	}
+
+	insertedEquals := utils.RecursiveUntypedEquals(result.InsertData, expectedInsertedData)
+	if !insertedEquals {
+		t.Errorf("expected InsertedData '%v', got '%v'", expectedInsertedData, result.InsertData)
+	}
+}
+
+// A - Source: empty, Target: filled
+// B - Source: row, Target: columnar
+func TestEqualizeEmptyRowSourceFilledColumnarTarget(t *testing.T) {
+	sourceData := parseJsonOrPanic(`[]`)
+	targetPayload := `{
+		"id": [1, 2, 3],
+		"name": ["Alice", "Bob", "Charlie"],
+		"updated_at": ["2020-01-01", "2020-01-02", "2020-01-03"]
+	}`
+	targetData := parseJsonOrPanic(targetPayload)
+	expectedEqualizedData := sourceSpec.NewColumnarTable()
+	expectedUpdateData := sourceSpec.NewColumnarTable()
+	expectedInsertedData := sourceSpec.NewColumnarTable()
+	expectedDeletedData := map[string][]interface{}{
+		"id":         {1, 2, 3},
+		"name":       {"Alice", "Bob", "Charlie"},
+		"updated_at": {"2020-01-01", "2020-01-02", "2020-01-03"},
+	}
+
+	result, err := Run(sourceSpec, targetSpec, sourceData, targetData)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+
+	equalizedEquals := utils.RecursiveUntypedEquals(result.EqualizedData, expectedEqualizedData)
+	if !equalizedEquals {
+		t.Errorf("expected EqualizedData '%v', got '%v'", expectedEqualizedData, result.EqualizedData)
+	}
+
+	updateEquals := utils.RecursiveUntypedEquals(result.UpdateData, expectedUpdateData)
+	if !updateEquals {
+		t.Errorf("expected UpdateData '%v', got '%v'", expectedUpdateData, result.UpdateData)
+	}
+
+	deletedEquals := utils.RecursiveUntypedEquals(result.DeleteData, expectedDeletedData)
+	if !deletedEquals {
+		t.Errorf("expected DeletedData '%v', got '%v'", expectedDeletedData, result.DeleteData)
+	}
+
+	insertedEquals := utils.RecursiveUntypedEquals(result.InsertData, expectedInsertedData)
+	if !insertedEquals {
+		t.Errorf("expected InsertedData '%v', got '%v'", expectedInsertedData, result.InsertData)
+	}
+}
+
+// A - Source: filled, Target: filled
+// B - Source: columnar, Target: columnar
+func TestEqualizeFilledColumnarSourceFilledColumnarTarget(t *testing.T) {
+	sourcePayload := `{
+		"id": [1, 2, 3],
+		"name": ["Alice", "Bob", "Charlie"],
+		"updated_at": ["2020-01-01", "2020-01-03", "2020-01-03"]
+	}`
+	sourceData := parseJsonOrPanic(sourcePayload)
+	targetPayload := `{
+		"id": [1, 2, 4],
+		"updated_at": ["2020-01-01", "2020-01-02", "2020-01-03"]
+	}`
+	targetData := parseJsonOrPanic(targetPayload)
+	expectedEqualizedData := parseJsonOrPanic(`{ "id": [1], "name": ["Alice"], "updated_at": ["2020-01-01"] }`)
+	expectedUpdateData := parseJsonOrPanic(`{ "id": [2], "name": ["Bob"], "updated_at": ["2020-01-03"] }`)
+	expectedInsertedData := parseJsonOrPanic(`{ "id": [3], "name": ["Charlie"], "updated_at": ["2020-01-03"] }`)
+	expectedDeletedData := parseJsonOrPanic(`{ "id": [4], "updated_at": ["2020-01-03"] }`)
+
+	result, err := Run(sourceSpec, targetSpec, sourceData, targetData)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+
+	equalizedEquals := utils.RecursiveUntypedEquals(result.EqualizedData, expectedEqualizedData)
+	if !equalizedEquals {
+		t.Errorf("expected EqualizedData '%v', got '%v'", expectedEqualizedData, result.EqualizedData)
+	}
+
+	updateEquals := utils.RecursiveUntypedEquals(result.UpdateData, expectedUpdateData)
+	if !updateEquals {
+		t.Errorf("expected UpdateData '%v', got '%v'", expectedUpdateData, result.UpdateData)
+	}
+
+	deletedEquals := utils.RecursiveUntypedEquals(result.DeleteData, expectedDeletedData)
+	if !deletedEquals {
+		t.Errorf("expected DeletedData '%v', got '%v'", expectedDeletedData, result.DeleteData)
+	}
+
+	insertedEquals := utils.RecursiveUntypedEquals(result.InsertData, expectedInsertedData)
+	if !insertedEquals {
+		t.Errorf("expected InsertedData '%v', got '%v'", expectedInsertedData, result.InsertData)
+	}
+}
+
 /*
 func TestEqualize(t *testing.T) {
 	sourceSpec := &specs.TableSpec{

@@ -229,47 +229,100 @@ func Run(sourceSpec, targetSpec *specs.TableSpec, sourceData, targetData interfa
 	if isTargetEmpty {
 		log.Println("target data is empty. returning source data as insert data")
 
-		if isTargetColumnar && isSourceColumnar {
+		if isTargetColumnar {
 			result.EqualizedData = sourceSpec.NewColumnarTable()
 			result.UpdateData = sourceSpec.NewColumnarTable()
 			result.DeleteData = targetSpec.NewColumnarTable()
+		}
+
+		if isTargetRow {
+			result.EqualizedData = []interface{}{}
+			result.UpdateData = []interface{}{}
+			result.DeleteData = []interface{}{}
+		}
+
+		// A - Source: filled, Target: empty
+		// B - Source: columnar, Target: columnar
+		if isTargetColumnar && isSourceColumnar {
 			result.InsertData = sourceData
 			return result, nil
 		}
 
+		// A - Source: filled, Target: empty
+		// B - Source: columnar, Target: row
 		if isTargetColumnar && isSourceRow {
-			result.EqualizedData = sourceSpec.NewColumnarTable()
-			result.UpdateData = sourceSpec.NewColumnarTable()
-			result.DeleteData = targetSpec.NewColumnarTable()
 			result.InsertData = sourceMapOfArrays
 			return result, nil
 		}
 
+		// A - Source: filled, Target: empty
+		// B - Source: row, Target: row
 		if isTargetRow && isSourceRow {
-			result.EqualizedData = []interface{}{}
-			result.UpdateData = []interface{}{}
-			result.DeleteData = []interface{}{}
 			result.InsertData = sourceData
 			return result, nil
 		}
 
+		// A - Source: filled, Target: empty
+		// B - Source: row, Target: columnar
 		if isTargetRow && isSourceColumnar {
-			result.EqualizedData = []interface{}{}
-			result.UpdateData = []interface{}{}
-			result.DeleteData = []interface{}{}
 			result.InsertData, err = transposer.ConvertToRowFormat(sourceSpec, sourceMapOfArrays)
 			if err != nil {
 				return nil, fmt.Errorf("source data error: " + err.Error())
 			}
 			return result, nil
 		}
-		panic("not implemented yet")
 
-	} else {
-		panic("not implemented yet")
+		panic("should not have reached here")
 	}
 
-	panic("CCCC")
+	if isSourceEmpty {
+		log.Println("source data is empty. returning target data as delete data")
+
+		if isTargetColumnar {
+			result.EqualizedData = sourceSpec.NewColumnarTable()
+			result.UpdateData = sourceSpec.NewColumnarTable()
+			result.InsertData = sourceSpec.NewColumnarTable()
+		}
+
+		if isTargetRow {
+			result.EqualizedData = []interface{}{}
+			result.UpdateData = []interface{}{}
+			result.InsertData = []interface{}{}
+		}
+
+		// A - Source: empty, Target: filled
+		// B - Source: columnar, Target: columnar
+		if isTargetColumnar && isSourceColumnar {
+			result.DeleteData = targetData
+			return result, nil
+		}
+
+		// A - Source: empty, Target: filled
+		// B - Source: columnar, Target: row
+		if isTargetColumnar && isSourceRow {
+			result.DeleteData = targetMapOfArrays
+			return result, nil
+		}
+
+		// A - Source: empty, Target: filled
+		// B - Source: row, Target: row
+		if isTargetRow && isSourceRow {
+			result.DeleteData = targetData
+			return result, nil
+		}
+
+		// A - Source: empty, Target: filled
+		// B - Source: row, Target: columnar
+		if isTargetRow && isSourceColumnar {
+			result.DeleteData, err = transposer.ConvertToRowFormat(targetSpec, targetMapOfArrays)
+			if err != nil {
+				return nil, fmt.Errorf("target data error: " + err.Error())
+			}
+			return result, nil
+		}
+
+		panic("should not have reached here")
+	}
 
 	log.Println("computing partition map for source data")
 	sourceRowKeyHashes, err := ComputePartitionMap(sourceSpec, sourceMapOfArrays)
