@@ -34,8 +34,6 @@ if (-not (Test-Path $TargetSpecFile)) {
 $targetSpec = Get-Content $TargetSpecFile -Raw | ConvertFrom-Json
 
 $headers = @{
-    Accept = "application/json"
-    ContentType = "application/json"
 }
 
 # create the rendezvous
@@ -46,27 +44,15 @@ $rendezvous = @{
 }
 $requestBody = $rendezvous | ConvertTo-Json -Depth 10
 
-Write-Host "Creating rendezvous named '$Name'"
-Write-Host "Request body: $requestBody"
-
 
 try {
     $url = $url + "/api/v1/rendezvous/$Name"
-    Write-Host "URL: $url"
-    $response = Invoke-RestMethod -Uri $url -Method Put -Headers $headers -Body $requestBody
+    $response = Invoke-RestMethod -Uri $url -Method Put -Headers $headers -Body $requestBody -ContentType "application/json"
+    Write-Output $response | ConvertTo-Json -Depth 10
 } catch {
-    Write-Error $_.Exception.Message
+    Write-Error "Failed to create rendezvous: $_"
     exit 1
 }
 
-$responseJson = $response| ConvertFrom-Json
-
-if ($response.StatusCode -eq 201) {
-    Write-Host $responseJson
-    exit 0
-} else {
-    Write-Error $responseJson
-    exit 1
-}
 
 

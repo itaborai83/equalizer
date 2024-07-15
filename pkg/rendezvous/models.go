@@ -33,11 +33,47 @@ func NewErrorApiResponse(code int, msg string) *ApiResponse {
 }
 
 func (r *ApiResponse) WriteTo(w http.ResponseWriter) {
-	w.Header().Set("Content-Type", r.contentType)
-	w.WriteHeader(r.code)
-	json.NewEncoder(w).Encode(r)
-	log.Println("API response sent")
-	log.Println(r)
+	var buffer []byte
+	log.Printf("API response: Status '%d', Message '%s'", r.code, r.msg)
+	log.Printf("API response: Data '%v'", r.data)
+
+	if r.contentType != "application/json" {
+		buffer = []byte(r.msg)
+		w.Header().Set("Content-Type", r.contentType)
+		w.WriteHeader(200)
+		w.Write(buffer)
+		return
+
+	} else {
+		if r.data != nil {
+			buffer, err := json.Marshal(r.data)
+			if err != nil {
+				log.Println("Error encoding API response")
+				log.Println(err)
+				http.Error(w, err.Error(), r.code)
+				return
+			}
+			w.Header().Set("Content-Type", r.contentType)
+			w.WriteHeader(200)
+			w.Write(buffer)
+			return
+		} else {
+			payload := map[string]interface{}{
+				"msg":  r.msg,
+				"code": r.code,
+			}
+			buffer, err := json.Marshal(payload)
+			if err != nil {
+				log.Println("Error encoding API response")
+				log.Println(err)
+				http.Error(w, err.Error(), r.code)
+				return
+			}
+			w.Header().Set("Content-Type", r.contentType)
+			w.WriteHeader(200)
+			w.Write(buffer)
+		}
+	}
 }
 
 // create a struct to represent a rendezvous internally
