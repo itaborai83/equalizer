@@ -232,8 +232,10 @@ func (s *service) GetSourceData(name string) *ApiResponse {
 		msg := fmt.Sprintf("cannot get source data: %s", err)
 		return NewErrorApiResponse(500, msg)
 	}
+	// convert data to string
+	text := string(data)
 	msg := fmt.Sprintf("source data retrieved from rendezvous '%s'", name)
-	return NewApiResponse(200, msg, data)
+	return NewApiResponse(200, msg, text)
 }
 
 func (s *service) GetTargetData(name string) *ApiResponse {
@@ -247,8 +249,10 @@ func (s *service) GetTargetData(name string) *ApiResponse {
 		msg := fmt.Sprintf("cannot get target data: %s", err)
 		return NewErrorApiResponse(500, msg)
 	}
+	// convert data to string
+	text := string(data)
 	msg := fmt.Sprintf("target data retrieved from rendezvous '%s'", name)
-	return NewApiResponse(200, msg, data)
+	return NewApiResponse(200, msg, text)
 }
 
 func (s *service) DeleteSourceData(name string) *ApiResponse {

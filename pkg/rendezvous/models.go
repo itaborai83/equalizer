@@ -35,7 +35,6 @@ func NewErrorApiResponse(code int, msg string) *ApiResponse {
 func (r *ApiResponse) WriteTo(w http.ResponseWriter) {
 	var buffer []byte
 	log.Printf("API response: Status '%d', Message '%s'", r.code, r.msg)
-	log.Printf("API response: Data '%v'", r.data)
 
 	if r.contentType != "application/json" {
 		buffer = []byte(r.msg)
