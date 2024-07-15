@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/itaborai83/equalizer/internal/utils"
 )
 
 type Repository interface {
@@ -59,9 +61,11 @@ func (r *FileRepository) write(rendezvous *Rendezvous) error {
 		return fmt.Errorf("cannot write rendezvous: %w", err)
 	}
 	rendezvousDir := filepath.Join(r.directory, rendezvous.Name)
-	err = os.Mkdir(rendezvousDir, 0755)
-	if err != nil {
-		return fmt.Errorf("cannot write rendezvous: %w", err)
+	if !utils.DoesDirectoryExist(rendezvousDir) {
+		err = os.Mkdir(rendezvousDir, 0755)
+		if err != nil {
+			return fmt.Errorf("cannot write rendezvous: %w", err)
+		}
 	}
 	rendezvousPath := filepath.Join(rendezvousDir, "rendezvous.json")
 	jsonBytes, err := json.Marshal(rendezvous)
