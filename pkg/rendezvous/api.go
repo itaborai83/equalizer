@@ -8,39 +8,18 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
+	"github.com/itaborai83/equalizer/internal/utils"
 )
 
-/*
-GET     /api/v1/rendezvous/                                     - Lista pontos de encontro de integrações
-
-PUT     /api/v1/rendezvous/<integration id>                     - Cria ponto de encontro de integração e o token de autorização para uso do mesmo
-GET     /api/v1/rendezvous/<integration id>                     - Recupera ponto de encontro de integração
-DELETE  /api/v1/rendezvous/<integration id>                     - Deleta ponto de encontro de integração
-
-PUT     /api/v1/rendezvous/<integration id>/source/data         - Upload dados de origem
-GET     /api/v1/rendezvous/<integration id>/source/data         - Recupera dados de origem
-DELETE  /api/v1/rendezvous/<integration id>/source/data         - Deleta dados de origem
-
-PUT     /api/v1/rendezvous/<integration id>/target/data         - Upload dados de destino
-GET     /api/v1/rendezvous/<integration id>/target/data         - Recupera dados de destino
-DELETE  /api/v1/rendezvous/<integration id>/target/data         - Deleta dados de destino
-
-POST    /api/v1/rendezvous/<integration id>/reconcile           - inicia rodada de reconciliação
-GET     /api/v1/rendezvous/<integration id>/reconcile           - recupera status da reconciliação
-GET     /api/v1/rendezvous/<integration id>/reconcile/log       - recupera log da reconciliação
-POST    /api/v1/rendezvous/<integration id>/reconcile/abort     - aborta reconciliação
-GET     /api/v1/rendezvous/<integration id>/reconcile/insert    - recupera registros para inserção do resultado da reconciliação
-GET     /api/v1/rendezvous/<integration id>/reconcile/update    - recupera registros para atualização do resultado da reconciliação
-GET     /api/v1/rendezvous/<integration id>/reconcile/delete    - recupera registros para exclusão do resultado da reconciliação
-GET     /api/v1/rendezvous/<integration id>/reconcile/equalized - recupera registros equalizados do resultado da reconciliação
-
-GET     /api/v1/workers                                         - Lista os processos de reconciliação
-*/
+var (
+	apiLog = utils.NewLogger("api")
+)
 
 func WithService(service Service) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		// return a new http.HandlerFunc that calls next.ServeHTTP(w, r) with the new context
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			apiLog.Println("Setting service in context")
 			ctx := context.WithValue(r.Context(), "service", service)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -50,7 +29,7 @@ func WithService(service Service) mux.MiddlewareFunc {
 func WithTokenChecking(next http.Handler) http.Handler {
 	// middleare that reads Authorization header and checks if the token is valid using the service provided in the context
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
+		apiLog.Println("Checking auth token")
 		// read the rendezvous service from the context
 		service := r.Context().Value("service").(Service)
 
@@ -61,6 +40,7 @@ func WithTokenChecking(next http.Handler) http.Handler {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
 			// if the token is empty, return a 400
+			apiLog.Println("cannot check auth token: no auth token provided")
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -68,6 +48,7 @@ func WithTokenChecking(next http.Handler) http.Handler {
 		// does the token start with "Bearer "?
 		if !strings.HasPrefix(authHeader, "Bearer ") {
 			// if not, return a 400
+			apiLog.Println("cannot check auth token: auth token must start with 'Bearer'")
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -80,6 +61,7 @@ func WithTokenChecking(next http.Handler) http.Handler {
 
 		if rendezvousName == "" {
 			// if the name is empty, return a 400
+			apiLog.Println("cannot check auth token: no rendezvous name provided")
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -88,11 +70,13 @@ func WithTokenChecking(next http.Handler) http.Handler {
 		valid, err := service.CheckAuthToken(token, rendezvousName)
 		if err != nil {
 			// if there was an error, return a 500
+			apiLog.Println("cannot check auth token: error checking token")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		if !valid {
 			// if the token is not valid, return a 401
+			apiLog.Println("cannot check auth token: invalid token")
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
@@ -103,12 +87,14 @@ func WithTokenChecking(next http.Handler) http.Handler {
 }
 
 func ListHandler(w http.ResponseWriter, r *http.Request) {
+	apiLog.Println("ListHandler")
 	service := r.Context().Value("service").(Service)
 	response := service.List()
 	response.WriteTo(w)
 }
 
 func CreateHandler(w http.ResponseWriter, r *http.Request) {
+	apiLog.Println("CreateHandler")
 	service := r.Context().Value("service").(Service)
 	var rendezvous RendezvousRequest
 	err := json.NewDecoder(r.Body).Decode(&rendezvous)
@@ -124,6 +110,7 @@ func CreateHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetHandler(w http.ResponseWriter, r *http.Request) {
+	apiLog.Println("GetHandler")
 	service := r.Context().Value("service").(Service)
 	vars := mux.Vars(r)
 	name := vars["name"]
@@ -132,6 +119,7 @@ func GetHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteHandler(w http.ResponseWriter, r *http.Request) {
+	apiLog.Println("DeleteHandler")
 	service := r.Context().Value("service").(Service)
 	vars := mux.Vars(r)
 	name := vars["name"]
@@ -140,6 +128,7 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func UpdateHandler(w http.ResponseWriter, r *http.Request) {
+	apiLog.Println("UpdateHandler")
 	service := r.Context().Value("service").(Service)
 	var rendezvous RendezvousRequest
 	err := json.NewDecoder(r.Body).Decode(&rendezvous)
@@ -155,6 +144,7 @@ func UpdateHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func UploadSourceDataHandler(w http.ResponseWriter, r *http.Request) {
+	apiLog.Println("UploadSourceDataHandler")
 	service := r.Context().Value("service").(Service)
 	vars := mux.Vars(r)
 	name := vars["name"]
@@ -169,6 +159,7 @@ func UploadSourceDataHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetSourceDataHandler(w http.ResponseWriter, r *http.Request) {
+	apiLog.Println("GetSourceDataHandler")
 	service := r.Context().Value("service").(Service)
 	vars := mux.Vars(r)
 	name := vars["name"]
@@ -177,6 +168,7 @@ func GetSourceDataHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteSourceDataHandler(w http.ResponseWriter, r *http.Request) {
+	apiLog.Println("DeleteSourceDataHandler")
 	service := r.Context().Value("service").(Service)
 	vars := mux.Vars(r)
 	name := vars["name"]
@@ -185,6 +177,7 @@ func DeleteSourceDataHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func UploadTargetDataHandler(w http.ResponseWriter, r *http.Request) {
+	apiLog.Println("UploadTargetDataHandler")
 	service := r.Context().Value("service").(Service)
 	vars := mux.Vars(r)
 	name := vars["name"]
@@ -199,6 +192,7 @@ func UploadTargetDataHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetTargetDataHandler(w http.ResponseWriter, r *http.Request) {
+	apiLog.Println("GetTargetDataHandler")
 	service := r.Context().Value("service").(Service)
 	vars := mux.Vars(r)
 	name := vars["name"]
@@ -207,9 +201,55 @@ func GetTargetDataHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteTargetDataHandler(w http.ResponseWriter, r *http.Request) {
+	apiLog.Println("DeleteTargetDataHandler")
 	service := r.Context().Value("service").(Service)
 	vars := mux.Vars(r)
 	name := vars["name"]
 	response := service.DeleteTargetData(name)
+	response.WriteTo(w)
+}
+
+func EqualizeHandler(w http.ResponseWriter, r *http.Request) {
+	apiLog.Println("EqualizeHandler")
+	service := r.Context().Value("service").(Service)
+	vars := mux.Vars(r)
+	name := vars["name"]
+	response := service.Equalize(name)
+	response.WriteTo(w)
+}
+
+func GetResultInsertDataHandler(w http.ResponseWriter, r *http.Request) {
+	apiLog.Println("GetResultInsertDataHandler")
+	service := r.Context().Value("service").(Service)
+	vars := mux.Vars(r)
+	name := vars["name"]
+	response := service.GetInsertData(name)
+	response.WriteTo(w)
+}
+
+func GetResultUpdateDataHandler(w http.ResponseWriter, r *http.Request) {
+	apiLog.Println("GetResultUpdateDataHandler")
+	service := r.Context().Value("service").(Service)
+	vars := mux.Vars(r)
+	name := vars["name"]
+	response := service.GetUpdateData(name)
+	response.WriteTo(w)
+}
+
+func GetResultDeleteDataHandler(w http.ResponseWriter, r *http.Request) {
+	apiLog.Println("GetResultDeleteDataHandler")
+	service := r.Context().Value("service").(Service)
+	vars := mux.Vars(r)
+	name := vars["name"]
+	response := service.GetDeleteData(name)
+	response.WriteTo(w)
+}
+
+func GetResultEqualizedData(w http.ResponseWriter, r *http.Request) {
+	apiLog.Println("GetResultEqualizedData")
+	service := r.Context().Value("service").(Service)
+	vars := mux.Vars(r)
+	name := vars["name"]
+	response := service.GetEqualizedData(name)
 	response.WriteTo(w)
 }

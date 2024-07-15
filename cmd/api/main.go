@@ -137,6 +137,26 @@ func main() {
 	handler = ChainMiddleware(http.HandlerFunc(rendezvous.DeleteTargetDataHandler), rendezvous.WithService(service), rendezvous.WithTokenChecking)
 	router.Handle("/api/v1/rendezvous/{name}/target", handler).Methods("DELETE")
 
+	// Equalize Data Handler
+	handler = ChainMiddleware(http.HandlerFunc(rendezvous.EqualizeHandler), rendezvous.WithService(service), rendezvous.WithTokenChecking)
+	router.Handle("/api/v1/rendezvous/{name}/equalize", handler).Methods("POST")
+
+	// Get Result Insert Data Handler
+	handler = ChainMiddleware(http.HandlerFunc(rendezvous.GetResultInsertDataHandler), rendezvous.WithService(service), rendezvous.WithTokenChecking)
+	router.Handle("/api/v1/rendezvous/{name}/result/insert", handler).Methods("GET")
+
+	// Get Result Update Data Handler
+	handler = ChainMiddleware(http.HandlerFunc(rendezvous.GetResultUpdateDataHandler), rendezvous.WithService(service), rendezvous.WithTokenChecking)
+	router.Handle("/api/v1/rendezvous/{name}/result/update", handler).Methods("GET")
+
+	// Get Result Delete Data Handler
+	handler = ChainMiddleware(http.HandlerFunc(rendezvous.GetResultDeleteDataHandler), rendezvous.WithService(service), rendezvous.WithTokenChecking)
+	router.Handle("/api/v1/rendezvous/{name}/result/delete", handler).Methods("GET")
+
+	// Get Result Equalized Data Handler
+	handler = ChainMiddleware(http.HandlerFunc(rendezvous.GetResultEqualizedData), rendezvous.WithService(service), rendezvous.WithTokenChecking)
+	router.Handle("/api/v1/rendezvous/{name}/result/equalized", handler).Methods("GET")
+
 	// start the server
 	addr := fmt.Sprintf("%s:%s", params.Host, params.Port)
 	log.Printf("Listening on %s\n", addr)

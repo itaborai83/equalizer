@@ -184,3 +184,43 @@ func ValidateDeleteTargetData(name string) error {
 	}
 	return nil
 }
+
+func ValidateEqualize(name string) error {
+	err := ValidateRendezvousName(name)
+	if err != nil {
+		return fmt.Errorf("cannot equalize data: %w", err)
+	}
+	return nil
+}
+
+func ValidateGetInsertData(name string) error {
+	err := ValidateRendezvousName(name)
+	if err != nil {
+		return fmt.Errorf("cannot get insert data: %w", err)
+	}
+	return nil
+}
+
+func ValidateGetUpdateData(name string) error {
+	err := ValidateRendezvousName(name)
+	if err != nil {
+		return fmt.Errorf("cannot get update data: %w", err)
+	}
+	return nil
+}
+
+func ValidateGetDeleteData(name string) error {
+	err := ValidateRendezvousName(name)
+	if err != nil {
+		return fmt.Errorf("cannot get delete data: %w", err)
+	}
+	return nil
+}
+
+func ValidateGetEqualizedData(name string) error {
+	err := ValidateRendezvousName(name)
+	if err != nil {
+		return fmt.Errorf("cannot get equalized data: %w", err)
+	}
+	return nil
+}
