@@ -5,17 +5,9 @@ PUT     /api/v1/rendezvous/<integration id>                     - Cria ponto de 
 GET     /api/v1/rendezvous/<integration id>                     - Recupera ponto de encontro de integração
 DELETE  /api/v1/rendezvous/<integration id>                     - Deleta ponto de encontro de integração
 
-PUT     /api/v1/rendezvous/<integration id>/source/spec         - Upload arquivo de especifições dos dados de origem
-GET     /api/v1/rendezvous/<integration id>/source/spec         - Recupera arquivo de especifições dos dados de origem
-DELETE  /api/v1/rendezvous/<integration id>/source/spec         - Deleta arquivo de especifições dos dados de origem
-
 PUT     /api/v1/rendezvous/<integration id>/source/data         - Upload dados de origem
 GET     /api/v1/rendezvous/<integration id>/source/data         - Recupera dados de origem
 DELETE  /api/v1/rendezvous/<integration id>/source/data         - Deleta dados de origem
-
-PUT     /api/v1/rendezvous/<integration id>/target/spec         - Upload arquivo de especifições dos dados de destino
-GET     /api/v1/rendezvous/<integration id>/target/spec         - Recupera arquivo de especifições dos dados de destino
-DELETE  /api/v1/rendezvous/<integration id>/target/spec         - Deleta arquivo de especifições dos dados de destino
 
 PUT     /api/v1/rendezvous/<integration id>/target/data         - Upload dados de destino
 GET     /api/v1/rendezvous/<integration id>/target/data         - Recupera dados de destino
