@@ -262,7 +262,8 @@ func (r *FileRepository) Delete(name string) error {
 	if !exists {
 		return fmt.Errorf("cannot delete rendezvous: rendezvous named '%s' does not exist", name)
 	}
-	err = os.Remove(filepath.Join(r.directory, name))
+	path := filepath.Join(r.directory, name)
+	err = os.RemoveAll(path)
 	if err != nil {
 		return fmt.Errorf("cannot delete rendezvous: %w", err)
 	}

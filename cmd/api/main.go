@@ -62,8 +62,9 @@ func loggingMiddleware(next http.Handler) http.Handler {
 }
 
 func ChainMiddleware(h http.Handler, middlewares ...mux.MiddlewareFunc) http.Handler {
-	for _, middleware := range middlewares {
-		h = middleware(h)
+	// need to iterate in reverse order
+	for i := len(middlewares) - 1; i >= 0; i-- {
+		h = middlewares[i](h)
 	}
 	return h
 }
