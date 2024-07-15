@@ -4,11 +4,16 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/itaborai83/equalizer/internal/utils"
 	"github.com/itaborai83/equalizer/pkg/specs"
 )
 
 const (
 	defaultContentType = "application/json"
+)
+
+var (
+	log = utils.NewLogger("rendezvous")
 )
 
 // Generic API response
@@ -31,6 +36,8 @@ func (r *ApiResponse) WriteTo(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", r.contentType)
 	w.WriteHeader(r.code)
 	json.NewEncoder(w).Encode(r)
+	log.Println("API response sent")
+	log.Println(r)
 }
 
 // create a struct to represent a rendezvous internally
@@ -52,7 +59,7 @@ type RendezvousResponse struct {
 
 // create a struct to represent a rendezvous creation endpoint
 type RendezvousRequest struct {
-	SourceSpec *specs.TableSpec
-	TargetSpec *specs.TableSpec
-	AuthToken  string
+	SourceSpec *specs.TableSpec `json:"source_spec"`
+	TargetSpec *specs.TableSpec `json:"target_spec"`
+	AuthToken  string           `json:"auth_token"`
 }

@@ -58,7 +58,12 @@ func (r *FileRepository) write(rendezvous *Rendezvous) error {
 	if err != nil {
 		return fmt.Errorf("cannot write rendezvous: %w", err)
 	}
-	rendezvousPath := filepath.Join(r.directory, rendezvous.Name)
+	rendezvousDir := filepath.Join(r.directory, rendezvous.Name)
+	err = os.Mkdir(rendezvousDir, 0755)
+	if err != nil {
+		return fmt.Errorf("cannot write rendezvous: %w", err)
+	}
+	rendezvousPath := filepath.Join(rendezvousDir, "rendezvous.json")
 	jsonBytes, err := json.Marshal(rendezvous)
 	if err != nil {
 		return fmt.Errorf("cannot marshal rendezvous to json: %w", err)
@@ -89,7 +94,7 @@ func (r *FileRepository) read(name string) (*Rendezvous, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot read rendezvous: %w", err)
 	}
-	rendezvousPath := filepath.Join(r.directory, name)
+	rendezvousPath := filepath.Join(r.directory, name, "rendezvous.json")
 	jsonBytes, err := os.ReadFile(rendezvousPath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read rendezvous from file: %w", err)

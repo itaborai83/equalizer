@@ -54,11 +54,10 @@ func HealthCheck(w http.ResponseWriter, r *http.Request) {
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Log request details
-		log.Println("Method: %s, URL: %s, RemoteAddr: %s\n", r.Method, r.URL.Path, r.RemoteAddr)
+		log.Printf("Method: %s, URL: %s, RemoteAddr: %s\n", r.Method, r.URL.Path, r.RemoteAddr)
 
 		// Pass the request to the next handler
 		next.ServeHTTP(w, r)
-		log.Println("Response: %d\n", w.Header().Get("Status"))
 	})
 }
 
@@ -91,11 +90,11 @@ func main() {
 	router.Use(loggingMiddleware)
 
 	// Health Check
-	router.HandleFunc("/health", HealthCheck).Methods("GET")
+	router.HandleFunc("/api/v1/health", HealthCheck).Methods("GET")
 
 	// List Handler
 	handler := ChainMiddleware(http.HandlerFunc(rendezvous.ListHandler), rendezvous.WithService(service))
-	router.Handle("/api/v1/rendezvous/", handler).Methods("GET")
+	router.Handle("/api/v1/rendezvous", handler).Methods("GET")
 
 	// Create Handler
 	handler = ChainMiddleware(http.HandlerFunc(rendezvous.CreateHandler), rendezvous.WithService(service))
